@@ -34,17 +34,17 @@
 - 确认阶段 2 主线采用“自造焊接工站模拟数据 + 开源机器人数据对照验证”的混合路线。
 - 新增阶段 2 设计文档：`docs/superpowers/specs/2026-06-07-rerun-stage-2-local-evaluation-design.md`。
 - 在 `README.md` 中补充阶段 2 设计文档入口。
+- 新增阶段 2 实施计划：`docs/superpowers/plans/2026-06-07-rerun-stage-2-local-evaluation.md`。
 
 ## 下一步计划
 
-1. 请用户确认阶段 2 设计文档。
-2. 设计阶段 2 implementation plan，拆分实验目录、Python 环境、模拟数据生成、`.rrd` 输出、Viewer 验证、Catalog/DataFrame 查询、开源数据对照和报告更新等任务。
-3. 建立最小实验目录和 Python 环境，验证 `rerun-sdk`、Viewer、`.rrd`、Blueprint、Catalog 和 DataFrame 查询。
-4. 生成模拟焊接工站数据，覆盖点云、图像、位姿、轨迹、日志、事件、工艺参数和模型输出。
-5. 设计一个模拟现场数据包，通过 external importer 将 CSV/JSON/图像目录转换为 Rerun recording。
-6. 选择并处理一个开源机器人数据源，作为非真机对照验证。
-7. 根据实验结果更新 `docs/research/` 中的路线判断，将“初判”改为“已验证/不适用/需替代”。
-8. 在阶段 2 完成后，再进入真实样板场景数据链路设计。
+1. 使用 sub-agent 方式执行阶段 2 implementation plan。
+2. 建立最小实验目录和 Python 环境，验证 `rerun-sdk`、Viewer、`.rrd`、Blueprint、Catalog 和 DataFrame 查询。
+3. 生成模拟焊接工站数据，覆盖点云、图像、位姿、轨迹、日志、事件、工艺参数和模型输出。
+4. 设计一个模拟现场数据包，通过 external importer 将 CSV/JSON/图像目录转换为 Rerun recording。
+5. 选择并处理一个开源机器人数据源，作为非真机对照验证。
+6. 根据实验结果更新 `docs/research/` 中的路线判断，将“初判”改为“已验证/不适用/需替代”。
+7. 在阶段 2 完成后，再进入真实样板场景数据链路设计。
 
 ## 维护约定
 
