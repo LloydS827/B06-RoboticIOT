@@ -35,6 +35,7 @@
 - 新增阶段 2 设计文档：`docs/superpowers/specs/2026-06-07-rerun-stage-2-local-evaluation-design.md`。
 - 在 `README.md` 中补充阶段 2 设计文档入口。
 - 新增阶段 2 实施计划：`docs/superpowers/plans/2026-06-07-rerun-stage-2-local-evaluation.md`。
+- 阶段 2 implementation 已进入执行，当前聚焦模拟焊接数据包、Rerun writer、候选样本导出、external-importer-style CLI 和 Viewer/Blueprint 人工检查文档。
 
 ## 下一步计划
 

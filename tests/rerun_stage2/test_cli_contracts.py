@@ -31,6 +31,14 @@ def test_generate_cli_help_runs():
     assert "--export-candidates" in result.stdout
 
 
+def test_importer_cli_help_runs():
+    result = run_script("scripts/rerun_importer_sim_weld.py", "--help")
+
+    assert result.returncode == 0
+    assert "--input-dir" in result.stdout
+    assert "--output-rrd" in result.stdout
+
+
 def test_generate_cli_rejects_zero_frames(tmp_path: Path):
     result = run_script(
         "scripts/generate_stage2_simulation.py",
