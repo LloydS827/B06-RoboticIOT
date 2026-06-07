@@ -19,14 +19,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if args.export_candidates:
-        parser.error("--export-candidates is reserved for Task 3 and is not implemented yet.")
     if args.frames < 1:
         parser.error("--frames must be >= 1.")
 
     config = RecordingConfig(frame_count=args.frames, random_seed=args.seed)
     package = write_simulation_package(args.output_dir, config)
     print(f"Wrote simulation package: {package.root}")
+
+    if args.export_candidates:
+        from rerun_stage2.query_export import export_candidate_rows
+
+        candidate_csv = export_candidate_rows(package.root, args.candidate_csv)
+        print(f"Wrote candidate rows: {candidate_csv}")
 
     if args.write_rrd:
         from rerun_stage2.rerun_writer import write_rrd
@@ -52,9 +56,14 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--export-candidates",
         action="store_true",
-        help="Export candidate records. Reserved for Task 3.",
+        help="Export high-risk candidate records to CSV.",
     )
-    parser.add_argument("--candidate-csv", type=Path, help="Output CSV for Task 3 candidate export.")
+    parser.add_argument(
+        "--candidate-csv",
+        type=Path,
+        default=Path("artifacts/stage2/candidate_rows.csv"),
+        help="Output CSV for candidate export.",
+    )
     return parser
 
 
