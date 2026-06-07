@@ -20,3 +20,8 @@ build/
 .env
 .env.*
 !.env.example
+
+# Stage 2 generated artifacts
+artifacts/
+*.rrd
+*.rbl
