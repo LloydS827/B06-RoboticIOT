@@ -48,23 +48,22 @@ def write_rrd(package_root: Path, output_rrd: Path) -> Path:
     actual_path = [frame.tcp_position for frame in frames]
 
     rr.init("b06_stage2_sim_weld", spawn=False)
-    rr.save(str(output_rrd))
+    try:
+        rr.save(str(output_rrd))
 
-    _log_coordinate_tree(rr, seam_path)
-    _log_static_scene(rr, point_cloud, planned_path, actual_path, seam_path)
+        _log_coordinate_tree(rr, seam_path)
+        _log_static_scene(rr, point_cloud, planned_path, actual_path, seam_path)
 
-    for frame in frames:
-        phase_index = _PHASE_INDEX.get(frame.weld_phase, -1)
-        rr.set_time_seconds("sim_time", frame.sim_time_s)
-        rr.set_time_sequence("robot_tick", frame.robot_tick)
-        rr.set_time_sequence("camera_frame", frame.camera_frame)
-        rr.set_time_sequence("weld_phase", phase_index)
-
-        _log_dynamic_tcp_transform(rr, frame)
-        _log(rr, "/station/robot/base/tcp/current", rr.Points3D([frame.tcp_position], radii=[0.012]))
-        _log(rr, "/station/camera/front/image", rr.Image(_read_image(package_root / frame.image_file)))
-        _log_process_scalars(rr, frame)
-        _log_event_text(rr, frame)
+        for frame in frames:
+            _set_frame_time(rr, frame)
+            _log_dynamic_tcp_transform(rr, frame)
+            _log(rr, "/station/robot/base/tcp/current", rr.Points3D([frame.tcp_position], radii=[0.012]))
+            _log(rr, "/station/camera/front/image", rr.Image(_read_image(package_root / frame.image_file)))
+            _log_process_scalars(rr, frame)
+            _log_event_text(rr, frame)
+    except Exception:
+        output_rrd.unlink(missing_ok=True)
+        raise
 
     return output_rrd
 
@@ -135,6 +134,14 @@ def _log_dynamic_tcp_transform(rr: Any, frame: _FrameRow) -> None:
         "/station/robot/base/tcp",
         _transform3d(rr, frame.tcp_position, frame.tcp_quaternion),
     )
+
+
+def _set_frame_time(rr: Any, frame: _FrameRow) -> None:
+    phase_index = _PHASE_INDEX.get(frame.weld_phase, -1)
+    rr.set_time("sim_time", duration=frame.sim_time_s)
+    rr.set_time("robot_tick", sequence=frame.robot_tick)
+    rr.set_time("camera_frame", sequence=frame.camera_frame)
+    rr.set_time("weld_phase", sequence=phase_index)
 
 
 def _log_static_scene(
