@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -37,6 +38,7 @@ def write_rrd(package_root: Path, output_rrd: Path) -> Path:
     package_root = Path(package_root)
     output_rrd = Path(output_rrd)
     output_rrd.parent.mkdir(parents=True, exist_ok=True)
+    temp_rrd = output_rrd.with_name(f".{output_rrd.name}.tmp")
 
     manifest = json.loads((package_root / "manifest.json").read_text(encoding="utf-8"))
     frames = _read_frames(package_root / "frames.csv")
@@ -49,7 +51,8 @@ def write_rrd(package_root: Path, output_rrd: Path) -> Path:
 
     rr.init("b06_stage2_sim_weld", spawn=False)
     try:
-        rr.save(str(output_rrd))
+        temp_rrd.unlink(missing_ok=True)
+        rr.save(str(temp_rrd))
 
         _log_coordinate_tree(rr, seam_path)
         _log_static_scene(rr, point_cloud, planned_path, actual_path, seam_path)
@@ -61,8 +64,9 @@ def write_rrd(package_root: Path, output_rrd: Path) -> Path:
             _log(rr, "/station/camera/front/image", rr.Image(_read_image(package_root / frame.image_file)))
             _log_process_scalars(rr, frame)
             _log_event_text(rr, frame)
+        os.replace(temp_rrd, output_rrd)
     except Exception:
-        output_rrd.unlink(missing_ok=True)
+        temp_rrd.unlink(missing_ok=True)
         raise
 
     return output_rrd

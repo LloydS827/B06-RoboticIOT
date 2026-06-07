@@ -21,6 +21,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.export_candidates:
         parser.error("--export-candidates is reserved for Task 3 and is not implemented yet.")
+    if args.frames < 1:
+        parser.error("--frames must be >= 1.")
 
     config = RecordingConfig(frame_count=args.frames, random_seed=args.seed)
     package = write_simulation_package(args.output_dir, config)

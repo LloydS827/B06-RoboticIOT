@@ -31,6 +31,19 @@ def test_generate_cli_help_runs():
     assert "--export-candidates" in result.stdout
 
 
+def test_generate_cli_rejects_zero_frames(tmp_path: Path):
+    result = run_script(
+        "scripts/generate_stage2_simulation.py",
+        "--output-dir",
+        str(tmp_path / "sim"),
+        "--frames",
+        "0",
+    )
+
+    assert result.returncode != 0
+    assert "--frames must be >= 1" in result.stderr
+
+
 def test_write_rrd_uses_rerun_033_set_time_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     package = write_simulation_package(tmp_path / "sim", RecordingConfig(frame_count=2))
     fake_rr = _FakeRerun()
@@ -54,6 +67,19 @@ def test_write_rrd_removes_output_when_rerun_logging_fails(tmp_path: Path, monke
         write_rrd(package.root, output_rrd)
 
     assert not output_rrd.exists()
+
+
+def test_write_rrd_preserves_existing_output_when_rewrite_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    package = write_simulation_package(tmp_path / "sim", RecordingConfig(frame_count=1))
+    output_rrd = tmp_path / "sim.rrd"
+    output_rrd.write_bytes(b"previous good recording")
+    fake_rr = _FakeRerun(fail_on_log=True)
+    monkeypatch.setitem(sys.modules, "rerun", fake_rr)
+
+    with pytest.raises(RuntimeError, match="simulated log failure"):
+        write_rrd(package.root, output_rrd)
+
+    assert output_rrd.read_bytes() == b"previous good recording"
 
 
 class _FakeArchetype:
