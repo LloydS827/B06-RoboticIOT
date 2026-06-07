@@ -1,4 +1,7 @@
+import builtins
 from pathlib import Path
+
+import pytest
 
 from rerun_stage2.sim_data import RecordingConfig, generate_frames, generate_point_cloud, write_simulation_package
 
@@ -44,3 +47,27 @@ def test_write_simulation_package_creates_manifest_tables_images_and_point_cloud
     assert (package.root / "point_cloud.csv").exists()
     assert (package.root / "images").is_dir()
     assert len(list((package.root / "images").glob("*.png"))) == 6
+
+
+def test_write_simulation_package_removes_stale_images_when_regenerating(tmp_path: Path):
+    package_root = tmp_path / "sim_weld_001"
+
+    write_simulation_package(package_root, RecordingConfig(frame_count=6, random_seed=7))
+    package = write_simulation_package(package_root, RecordingConfig(frame_count=3, random_seed=7))
+
+    image_files = sorted(path.name for path in (package.root / "images").glob("*.png"))
+    assert image_files == ["frame_0000.png", "frame_0001.png", "frame_0002.png"]
+
+
+def test_write_simulation_package_fails_loudly_when_pillow_is_missing(tmp_path: Path, monkeypatch):
+    original_import = builtins.__import__
+
+    def fail_pillow_import(name, *args, **kwargs):
+        if name == "PIL" or name.startswith("PIL."):
+            raise ImportError("simulated missing pillow")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fail_pillow_import)
+
+    with pytest.raises(RuntimeError, match="Pillow"):
+        write_simulation_package(tmp_path / "sim_weld_001", RecordingConfig(frame_count=1, random_seed=7))

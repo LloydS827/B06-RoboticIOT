@@ -6,9 +6,7 @@ import csv
 import json
 import math
 import random
-import struct
-import zlib
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -132,6 +130,7 @@ def write_simulation_package(root: str | Path, config: RecordingConfig) -> Simul
     images_dir = root_path / "images"
     root_path.mkdir(parents=True, exist_ok=True)
     images_dir.mkdir(exist_ok=True)
+    _remove_stale_frame_images(images_dir)
 
     frames = generate_frames(config)
     points = generate_point_cloud(config)
@@ -286,12 +285,16 @@ def _write_point_cloud_csv(path: Path, points: list[tuple[float, float, float]])
         writer.writerows(points)
 
 
+def _remove_stale_frame_images(images_dir: Path) -> None:
+    for image_path in images_dir.glob("frame_*.png"):
+        image_path.unlink()
+
+
 def _write_frame_image(path: Path, config: RecordingConfig, frame: FrameSample) -> None:
     try:
         from PIL import Image, ImageDraw
-    except ImportError:
-        _write_blank_png(path, config.image_width, config.image_height)
-        return
+    except ImportError as exc:
+        raise RuntimeError("Pillow is required to generate semantic weld-line simulation images.") from exc
 
     image = Image.new("RGB", (config.image_width, config.image_height), (26, 31, 36))
     draw = ImageDraw.Draw(image)
@@ -315,17 +318,3 @@ def _write_frame_image(path: Path, config: RecordingConfig, frame: FrameSample) 
         draw.line((marker_x - 10, marker_y - 14, marker_x + 10, marker_y - 14), fill=(239, 68, 68), width=3)
 
     image.save(path)
-
-
-def _write_blank_png(path: Path, width: int, height: int) -> None:
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
-
-    raw_rows = b"".join(b"\x00" + b"\x1a\x1f\x24" * width for _ in range(height))
-    png = (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(raw_rows))
-        + chunk(b"IEND", b"")
-    )
-    path.write_bytes(png)
