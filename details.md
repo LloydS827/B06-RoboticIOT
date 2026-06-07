@@ -35,17 +35,26 @@
 - 新增阶段 2 设计文档：`docs/superpowers/specs/2026-06-07-rerun-stage-2-local-evaluation-design.md`。
 - 在 `README.md` 中补充阶段 2 设计文档入口。
 - 新增阶段 2 实施计划：`docs/superpowers/plans/2026-06-07-rerun-stage-2-local-evaluation.md`。
-- 阶段 2 implementation 已进入执行，当前聚焦模拟焊接数据包、Rerun writer、候选样本导出、external-importer-style CLI 和 Viewer/Blueprint 人工检查文档。
+- 按 superpowers 流程完成阶段 2 implementation plan 的任务拆解，并使用 sub-agent 方式完成分步执行和复核。
+- 新增 Python 工程骨架和阶段 2 依赖配置：`pyproject.toml`、`src/rerun_stage2/`、`tests/rerun_stage2/`。
+- 完成模拟机器人焊接工站数据包生成，覆盖 `manifest.json`、`frames.csv`、`events.csv`、`quality.json`、`point_cloud.csv` 和图像序列。
+- 完成 Rerun writer，验证 `.rrd` 写入、多 timeline、Transform3D、图像、点云、轨迹、TCP、工艺参数、缺陷概率和事件日志。
+- 完成候选样本 CSV 导出，用于按缺陷概率筛选训练/评测候选帧。
+- 完成 external-importer-style CLI：`scripts/rerun_importer_sim_weld.py`。
+- 完成阶段 2 运行说明和 Viewer/Blueprint 人工检查清单：`docs/stage2/README.md`、`docs/stage2/viewer_blueprint_checklist.md`。
+- 完成 LeRobot PushT 开源机器人小样本下载、字段读取和模拟包转换对照。
+- 完成本地 Catalog table 创建/查询尝试和 `.rrd` Chunk/DataFrame 查询尝试。
+- 新增阶段 2 技术评测报告：`docs/research/04-rerun阶段二本地技术评测报告.md`。
+- 更新 Rerun 二次开发路线判断矩阵，补充阶段 2 验证状态。
 
 ## 下一步计划
 
-1. 使用 sub-agent 方式执行阶段 2 implementation plan。
-2. 建立最小实验目录和 Python 环境，验证 `rerun-sdk`、Viewer、`.rrd`、Blueprint、Catalog 和 DataFrame 查询。
-3. 生成模拟焊接工站数据，覆盖点云、图像、位姿、轨迹、日志、事件、工艺参数和模型输出。
-4. 设计一个模拟现场数据包，通过 external importer 将 CSV/JSON/图像目录转换为 Rerun recording。
-5. 选择并处理一个开源机器人数据源，作为非真机对照验证。
-6. 根据实验结果更新 `docs/research/` 中的路线判断，将“初判”改为“已验证/不适用/需替代”。
-7. 在阶段 2 完成后，再进入真实样板场景数据链路设计。
+1. 按 `docs/stage2/viewer_blueprint_checklist.md` 完成 Viewer/Blueprint 人工视觉检查，并记录截图、布局保存结果和异常。
+2. 对阶段 2 输出做一次轻量性能冒烟，至少记录长帧数、较大点云、图像序列写入和打开体验。
+3. 继续寻找更贴近机器人焊接或工业工站的公开数据源；如果找不到，则扩展模拟数据覆盖更真实的工艺异常、传感器噪声和质量标签。
+4. 启动 CavLAB 自有数据包 schema 草案，定义任务上下文、设备、工件、工艺、事件、质量、坐标系和数据血缘。
+5. 将 importer 原型升级为可配置的数据包转换器，但继续把 Rerun 依赖隔离在外围。
+6. 阶段三前明确真实样板场景的最小字段清单、现场数据采集边界和验收样例。
 
 ## 维护约定
 

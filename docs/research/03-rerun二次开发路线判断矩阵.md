@@ -120,3 +120,25 @@
 3. 等真实样板场景跑通后，再判断是否 fork、插件化扩展，或仅把 Rerun 作为开发期工具。
 
 如果一开始就深入 fork，容易在尚未确认现场数据模型前被工具内部结构牵着走。当前更关键的是让真实作业数据被完整记录、回放、查询、整理和导出。
+
+## 7. 阶段二验证状态
+
+阶段二本地技术评测已完成第一轮可运行闭环，详见 [Rerun.io 阶段二本地技术评测报告](04-rerun阶段二本地技术评测报告.md)。
+
+| 能力项 | 阶段二状态 | 说明 | 后续判断 |
+| --- | --- | --- | --- |
+| Python SDK | 已验证 | 可用本项目 wrapper 写入模拟焊接工站数据 | 继续直接复用，外层保持自有封装 |
+| `.rrd` recording | 已验证 | 生成文件通过 `rerun rrd verify` | 继续作为实验样本包和回放文件 |
+| Entity Path | 已验证 | 已形成 `/station/...` 最小路径结构 | 进入自有命名规范设计 |
+| Transform | 已验证 | 已写入工站、工件、机器人 base、相机和 TCP 坐标关系 | 后续补充标定版本和工件局部坐标规范 |
+| Timeline/Event | 已验证 | 已覆盖 `sim_time`、`robot_tick`、`camera_frame`、`weld_phase` 和事件日志 | 后续验证真实多设备时钟同步 |
+| 图像/点云/轨迹/工艺参数 | 已验证 | 模拟数据可写入并被 CLI stats 识别 | 后续扩大规模做性能冒烟 |
+| Candidate CSV 导出 | 已验证 | 可按缺陷概率导出候选训练/评测样本 | 沉淀为自有样本筛选接口 |
+| External importer | 原型已验证 | 当前是 external-importer-style CLI，未实现完整 Rerun 协议 | 继续按自有数据包导入规范推进 |
+| Catalog | 本地已验证 | 可创建本地 table 并查询候选记录 | 暂不视为产品级数据治理能力 |
+| DataFrame/Chunk 查询 | 本地已验证 | 可通过 `rerun.experimental.RrdReader.stream()` 读取 chunks | 继续验证 API 稳定性和训练导出适配 |
+| LeRobot 开源数据对照 | 已验证小样本 | 可下载并读取 PushT parquet 的状态、动作、图像和时间字段 | 只能做结构对照，不能替代焊接数据 |
+| Viewer/Blueprint | 待人工检查 | 已生成 `.rrd` 和检查清单，尚未完成 GUI 视觉验收 | 阶段三前补充截图和布局保存记录 |
+| 真机/ROS/Gazebo/MoveIt | 本阶段不适用 | 已明确不借真机、不引入仿真平台 | 阶段三再按样板场景决定 |
+
+阶段二结果进一步支持当前路线：短期继续复用 Rerun 原生能力，中期在外围形成 CavLAB 自有 schema、wrapper、importer 和数据包规范，暂不 fork Rerun 做深度修改。
