@@ -10,6 +10,7 @@ from typing import Callable
 from physical_ai_data.candidates import export_candidates, summarize_package
 from physical_ai_data.rerun_adapter import write_rrd
 from physical_ai_data.samples import generate_pick_sort_package, generate_welding_package
+from physical_ai_data.schema import ValidationResult
 from physical_ai_data.validation import validate_package
 
 
@@ -83,13 +84,7 @@ def _generate_pick_sort(args: argparse.Namespace) -> int:
 
 def _validate(args: argparse.Namespace) -> int:
     result = validate_package(args.package)
-    payload = {
-        "ok": result.ok,
-        "package": str(args.package),
-        "summary": result.summary,
-        "errors": [asdict(error) for error in result.errors],
-        "warnings": [asdict(warning) for warning in result.warnings],
-    }
+    payload = _validation_payload(args.package, result)
     if args.json:
         _print_json(payload)
     elif result.ok:
@@ -102,12 +97,18 @@ def _validate(args: argparse.Namespace) -> int:
 
 
 def _summarize(args: argparse.Namespace) -> int:
-    summary = summarize_package(args.package)
     if args.json:
-        _print_json(summary)
-    else:
-        print(f"Package summary: {args.package}")
-        print(_format_summary(summary))
+        validation = validate_package(args.package)
+        if not validation.ok:
+            _print_json(_validation_payload(args.package, validation))
+            return 1
+
+        _print_json(summarize_package(args.package))
+        return 0
+
+    summary = summarize_package(args.package)
+    print(f"Package summary: {args.package}")
+    print(_format_summary(summary))
     return 0
 
 
@@ -125,6 +126,16 @@ def _convert_rerun(args: argparse.Namespace) -> int:
 
 def _print_json(payload: object) -> None:
     print(json.dumps(payload, indent=2) + "\n", end="")
+
+
+def _validation_payload(package: Path, result: ValidationResult) -> dict[str, object]:
+    return {
+        "ok": result.ok,
+        "package": str(package),
+        "summary": result.summary,
+        "errors": [asdict(error) for error in result.errors],
+        "warnings": [asdict(warning) for warning in result.warnings],
+    }
 
 
 def _format_summary(summary: dict[str, object]) -> str:
@@ -150,4 +161,3 @@ def _print_messages(messages: list[object], file: object) -> None:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
