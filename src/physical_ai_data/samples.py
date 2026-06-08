@@ -15,10 +15,10 @@ IMAGE_SIZE = (160, 96)
 
 def generate_welding_package(root: str | Path, frame_count: int = 60, random_seed: int = 42) -> Path:
     package_root = Path(root)
+    frame_total = _require_min_frame_count(frame_count, minimum=3, scenario_name="welding")
     _prepare_package_dirs(package_root)
 
     rng = random.Random(random_seed)
-    frame_total = _positive_frame_count(frame_count)
     frames: list[dict[str, object]] = []
     metric_rows: list[dict[str, object]] = []
     trajectory_rows: list[dict[str, object]] = []
@@ -76,10 +76,10 @@ def generate_welding_package(root: str | Path, frame_count: int = 60, random_see
 
 def generate_pick_sort_package(root: str | Path, frame_count: int = 40, random_seed: int = 42) -> Path:
     package_root = Path(root)
+    frame_total = _require_min_frame_count(frame_count, minimum=6, scenario_name="pick/sort")
     _prepare_package_dirs(package_root)
 
     rng = random.Random(random_seed)
-    frame_total = _positive_frame_count(frame_count)
     frames: list[dict[str, object]] = []
     metric_rows: list[dict[str, object]] = []
     trajectory_rows: list[dict[str, object]] = []
@@ -135,13 +135,13 @@ def _prepare_package_dirs(root: Path) -> None:
     ensure_dir(root)
     for relative_path in ("artifacts/images", "artifacts/point_clouds", "artifacts/trajectories"):
         ensure_dir(root / relative_path)
-    for image in (root / "artifacts/images").glob("*.png"):
+    for image in (root / "artifacts/images").glob("frame_*.png"):
         image.unlink()
 
 
-def _positive_frame_count(frame_count: int) -> int:
-    if frame_count < 1:
-        raise ValueError("frame_count must be at least 1")
+def _require_min_frame_count(frame_count: int, minimum: int, scenario_name: str) -> int:
+    if frame_count < minimum:
+        raise ValueError(f"{scenario_name} frame_count must be at least {minimum}")
     return frame_count
 
 
