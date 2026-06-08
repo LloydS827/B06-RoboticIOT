@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 from typing import Mapping
@@ -170,7 +171,11 @@ def _load_tables(
         table_path = table_paths.get(table_name)
         if table_path is None or not table_path.exists():
             continue
-        rows = read_csv_rows(table_path)
+        try:
+            rows = read_csv_rows(table_path)
+        except (OSError, UnicodeDecodeError, csv.Error) as exc:
+            errors.append(ValidationMessage("unreadable_table", f"Cannot read table {table_ref}: {exc}", table_ref))
+            continue
         _validate_csv_rows(table_ref, rows, errors)
         table_rows[table_name] = rows
         columns = set(rows[0].keys()) if rows else _read_csv_header(table_path)
@@ -223,7 +228,7 @@ def _validate_rows(
     for row_index, label in enumerate(table_rows.get("labels", []), start=1):
         path = f"labels.csv:{row_index}"
         _validate_non_empty_id(label, "label_id", path, errors)
-        target_ref = label.get("target_ref", "")
+        target_ref = label.get("target_ref") or ""
         if target_ref.startswith("frame:"):
             if target_ref.removeprefix("frame:") not in frame_ids:
                 errors.append(ValidationMessage("unknown_frame_id", f"labels.csv row {row_index} references unknown {target_ref}", path))
@@ -355,6 +360,14 @@ def _validate_csv_rows(table_ref: str, rows: list[dict[str, str]], errors: list[
                 ValidationMessage(
                     "malformed_csv_row",
                     f"{table_ref} row {row_index} has more values than header columns",
+                    f"{table_ref}:{row_index}",
+                )
+            )
+        if any(field is not None and value is None for field, value in row.items()):
+            errors.append(
+                ValidationMessage(
+                    "malformed_csv_row",
+                    f"{table_ref} row {row_index} has fewer values than header columns",
                     f"{table_ref}:{row_index}",
                 )
             )

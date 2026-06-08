@@ -236,6 +236,30 @@ def test_malformed_csv_row_reports_error_instead_of_crashing(tmp_path: Path):
     assert any(error.code == "malformed_csv_row" and "frames.csv" in error.message for error in result.errors)
 
 
+def test_table_read_failure_reports_error_instead_of_crashing(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    (tmp_path / "frames.csv").unlink()
+    (tmp_path / "frames.csv").mkdir()
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "unreadable_table" and "frames.csv" in error.message for error in result.errors)
+
+
+def test_underfilled_label_row_reports_error_instead_of_crashing(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    with (tmp_path / "labels.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(["label_id", "label_type", "target_ref", "value", "confidence", "source"])
+        writer.writerow(["label_0001", "quality"])
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "malformed_csv_row" and "labels.csv" in error.message for error in result.errors)
+
+
 def test_manifest_devices_objects_and_timelines_must_be_lists(tmp_path: Path):
     _write_minimal_package(tmp_path)
     manifest_path = tmp_path / "physical_ai_manifest.json"
