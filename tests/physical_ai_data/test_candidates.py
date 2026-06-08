@@ -27,7 +27,7 @@ def _source_ids(rows: list[dict[str, str]]) -> str:
 
 def _candidate_with_source(rows: list[dict[str, str]], source_id: str) -> dict[str, str]:
     for row in rows:
-        if source_id in row["source_id"]:
+        if source_id in row["source_id"].split("|"):
             return row
     raise AssertionError(f"Missing candidate for source_id {source_id}")
 
@@ -171,6 +171,82 @@ def test_export_merges_duplicate_frame_candidates_with_reasons(tmp_path: Path):
     assert "event:porosity_risk" in merged["reasons"]
     assert "label:quality" in merged["reasons"]
     assert "metric:defect_probability" in merged["reasons"]
+
+
+def test_export_ignores_non_finite_label_confidence_metric_value_and_timestamp(tmp_path: Path):
+    package = generate_welding_package(tmp_path / "weld", frame_count=8, random_seed=2)
+    labels = _rows(package / "labels.csv")
+    labels.extend(
+        [
+            {
+                "label_id": "label_nan_confidence",
+                "label_type": "quality",
+                "target_ref": "object:seam_001",
+                "value": "review",
+                "confidence": "nan",
+                "source": "test",
+            },
+            {
+                "label_id": "label_inf_confidence",
+                "label_type": "quality",
+                "target_ref": "object:seam_001",
+                "value": "review",
+                "confidence": "inf",
+                "source": "test",
+            },
+        ]
+    )
+    _write_rows(package / "labels.csv", labels)
+
+    metrics = _rows(package / "metrics.csv")
+    metrics.extend(
+        [
+            {
+                "metric_id": "metric_nan_value",
+                "timestamp_s": "0.0",
+                "metric_name": "quality_score",
+                "value": "nan",
+                "unit": "ratio",
+                "source": "test",
+            },
+            {
+                "metric_id": "metric_inf_value",
+                "timestamp_s": "0.0",
+                "metric_name": "quality_score",
+                "value": "inf",
+                "unit": "ratio",
+                "source": "test",
+            },
+            {
+                "metric_id": "metric_nan_timestamp",
+                "timestamp_s": "nan",
+                "metric_name": "quality_score",
+                "value": "0.8",
+                "unit": "ratio",
+                "source": "test",
+            },
+            {
+                "metric_id": "metric_inf_timestamp",
+                "timestamp_s": "inf",
+                "metric_name": "quality_score",
+                "value": "0.9",
+                "unit": "ratio",
+                "source": "test",
+            },
+        ]
+    )
+    _write_rows(package / "metrics.csv", metrics)
+
+    output = export_candidates(package, min_score=0.5)
+    rows = _rows(output)
+    source_ids = _source_ids(rows)
+
+    assert "label_nan_confidence" not in source_ids
+    assert "label_inf_confidence" not in source_ids
+    assert "metric_nan_value" not in source_ids
+    assert "metric_inf_value" not in source_ids
+    assert _candidate_with_source(rows, "metric_nan_timestamp")["frame_id"] == ""
+    assert _candidate_with_source(rows, "metric_inf_timestamp")["frame_id"] == ""
 
 
 def test_export_candidates_does_not_match_nearest_frames_outside_sim_time(tmp_path: Path):

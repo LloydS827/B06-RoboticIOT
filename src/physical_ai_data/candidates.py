@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Mapping
 
@@ -247,9 +248,12 @@ def _nearest_frame_id(frames: list[dict[str, str]], timestamp_s: str) -> str:
 
 def _parse_float(value: str) -> float | None:
     try:
-        return float(value)
+        parsed = float(value)
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
 
 
 def _format_number(value: float) -> str:
