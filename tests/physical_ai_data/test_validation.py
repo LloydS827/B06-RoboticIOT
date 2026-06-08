@@ -6,6 +6,16 @@ from pathlib import Path
 
 from physical_ai_data.validation import validate_package
 
+EXPECTED_SUMMARY_KEYS = {
+    "package_id",
+    "scenario_type",
+    "frame_count",
+    "event_count",
+    "label_count",
+    "metric_count",
+    "artifact_ref_count",
+}
+
 
 def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, object]]) -> None:
     with path.open("w", newline="", encoding="utf-8") as file:
@@ -101,6 +111,9 @@ def test_missing_manifest_reports_error(tmp_path: Path):
 
     assert not result.ok
     assert any(error.code == "missing_manifest" for error in result.errors)
+    assert EXPECTED_SUMMARY_KEYS <= result.summary.keys()
+    assert result.summary["package_id"] == ""
+    assert result.summary["frame_count"] == 0
 
 
 def test_missing_required_table_column_reports_error(tmp_path: Path):
@@ -111,6 +124,19 @@ def test_missing_required_table_column_reports_error(tmp_path: Path):
 
     assert not result.ok
     assert any(error.code == "missing_table_columns" and "timestamp_s" in error.message for error in result.errors)
+
+
+def test_missing_declared_extra_table_reports_error(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    manifest_path = tmp_path / "physical_ai_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["tables"]["candidates"] = "missing_candidates.csv"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "missing_table" and "missing_candidates.csv" in error.message for error in result.errors)
 
 
 def test_non_empty_ref_must_exist(tmp_path: Path):

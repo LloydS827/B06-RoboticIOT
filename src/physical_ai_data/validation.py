@@ -22,7 +22,7 @@ def validate_package(package_root: str | Path) -> ValidationResult:
     root = Path(package_root)
     errors: list[ValidationMessage] = []
     warnings: list[ValidationMessage] = []
-    summary: dict[str, object] = {}
+    summary = _default_summary()
 
     if not root.exists():
         return ValidationResult(
@@ -143,14 +143,27 @@ def _load_tables(
         errors.append(ValidationMessage("invalid_tables", "Manifest tables must be an object", "tables"))
         return table_rows
 
+    for table_name, table_ref in tables.items():
+        if not isinstance(table_ref, str) or not table_ref:
+            errors.append(
+                ValidationMessage(
+                    "missing_table",
+                    f"Manifest tables.{table_name} must be a non-empty path",
+                    f"tables.{table_name}",
+                )
+            )
+            continue
+        if not (root / table_ref).exists():
+            errors.append(ValidationMessage("missing_table", f"Missing table file: {table_ref}", table_ref))
+
     for table_name, required_columns in REQUIRED_TABLE_COLUMNS.items():
         table_ref = tables.get(table_name)
         if not isinstance(table_ref, str) or not table_ref:
-            errors.append(ValidationMessage("missing_table", f"Manifest tables.{table_name} is required", f"tables.{table_name}"))
+            if table_name not in tables:
+                errors.append(ValidationMessage("missing_table", f"Manifest tables.{table_name} is required", f"tables.{table_name}"))
             continue
         table_path = root / table_ref
         if not table_path.exists():
-            errors.append(ValidationMessage("missing_table", f"Missing table file: {table_ref}", table_ref))
             continue
         rows = read_csv_rows(table_path)
         table_rows[table_name] = rows
@@ -266,6 +279,18 @@ def _collect_ids(value: object, id_field: str) -> set[str]:
     if not isinstance(value, list):
         return set()
     return {str(item.get(id_field, "")) for item in value if isinstance(item, Mapping) and item.get(id_field, "")}
+
+
+def _default_summary() -> dict[str, object]:
+    return {
+        "package_id": "",
+        "scenario_type": "",
+        "frame_count": 0,
+        "event_count": 0,
+        "label_count": 0,
+        "metric_count": 0,
+        "artifact_ref_count": 0,
+    }
 
 
 def _count_artifact_refs(manifest: Mapping[str, object], table_rows: Mapping[str, list[dict[str, str]]]) -> int:
