@@ -4,6 +4,8 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from physical_ai_data.validation import validate_package
 
 EXPECTED_SUMMARY_KEYS = {
@@ -295,6 +297,29 @@ def test_events_and_metrics_timestamp_must_be_numeric(tmp_path: Path):
     assert not result.ok
     assert any(error.code == "invalid_timestamp" and "events.csv" in error.message for error in result.errors)
     assert any(error.code == "invalid_timestamp" and "metrics.csv" in error.message for error in result.errors)
+
+
+@pytest.mark.parametrize(
+    ("table_name", "timestamp_s"),
+    [
+        ("frames.csv", "nan"),
+        ("frames.csv", "inf"),
+        ("events.csv", "nan"),
+        ("events.csv", "-inf"),
+        ("metrics.csv", "nan"),
+        ("metrics.csv", "inf"),
+    ],
+)
+def test_timestamp_must_be_finite(tmp_path: Path, table_name: str, timestamp_s: str):
+    _write_minimal_package(tmp_path)
+    rows = list(csv.DictReader((tmp_path / table_name).open(newline="", encoding="utf-8")))
+    rows[0]["timestamp_s"] = timestamp_s
+    _write_csv(tmp_path / table_name, list(rows[0].keys()), rows)
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_timestamp" and table_name in error.message for error in result.errors)
 
 
 def test_label_target_refs_must_exist(tmp_path: Path):

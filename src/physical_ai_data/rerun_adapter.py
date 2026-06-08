@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 import os
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -284,9 +285,12 @@ def _scalars(rr: Any, value: float) -> Any:
 
 def _float_or_none(value: object) -> float | None:
     try:
-        return float(str(value))
+        parsed = float(str(value))
     except (TypeError, ValueError):
         return None
+    if not math.isfinite(parsed):
+        return None
+    return parsed
 
 
 def _event_text(event: Mapping[str, str]) -> str:

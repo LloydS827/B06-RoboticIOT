@@ -173,7 +173,7 @@ def test_export_merges_duplicate_frame_candidates_with_reasons(tmp_path: Path):
     assert "metric:defect_probability" in merged["reasons"]
 
 
-def test_export_ignores_non_finite_label_confidence_metric_value_and_timestamp(tmp_path: Path):
+def test_export_ignores_non_finite_label_confidence_and_metric_value(tmp_path: Path):
     package = generate_welding_package(tmp_path / "weld", frame_count=8, random_seed=2)
     labels = _rows(package / "labels.csv")
     labels.extend(
@@ -217,22 +217,6 @@ def test_export_ignores_non_finite_label_confidence_metric_value_and_timestamp(t
                 "unit": "ratio",
                 "source": "test",
             },
-            {
-                "metric_id": "metric_nan_timestamp",
-                "timestamp_s": "nan",
-                "metric_name": "quality_score",
-                "value": "0.8",
-                "unit": "ratio",
-                "source": "test",
-            },
-            {
-                "metric_id": "metric_inf_timestamp",
-                "timestamp_s": "inf",
-                "metric_name": "quality_score",
-                "value": "0.9",
-                "unit": "ratio",
-                "source": "test",
-            },
         ]
     )
     _write_rows(package / "metrics.csv", metrics)
@@ -245,8 +229,6 @@ def test_export_ignores_non_finite_label_confidence_metric_value_and_timestamp(t
     assert "label_inf_confidence" not in source_ids
     assert "metric_nan_value" not in source_ids
     assert "metric_inf_value" not in source_ids
-    assert _candidate_with_source(rows, "metric_nan_timestamp")["frame_id"] == ""
-    assert _candidate_with_source(rows, "metric_inf_timestamp")["frame_id"] == ""
 
 
 def test_export_candidates_does_not_match_nearest_frames_outside_sim_time(tmp_path: Path):

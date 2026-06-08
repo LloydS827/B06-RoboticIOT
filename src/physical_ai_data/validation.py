@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Mapping
 
@@ -281,8 +282,11 @@ def _validate_numeric(
     errors: list[ValidationMessage],
 ) -> None:
     try:
-        float(row.get(field, ""))
+        value = float(row.get(field, ""))
     except (TypeError, ValueError):
+        errors.append(ValidationMessage("invalid_timestamp", f"{table_name} row {row_index} has invalid {field}", f"{table_name}:{row_index}"))
+        return
+    if not math.isfinite(value):
         errors.append(ValidationMessage("invalid_timestamp", f"{table_name} row {row_index} has invalid {field}", f"{table_name}:{row_index}"))
 
 
