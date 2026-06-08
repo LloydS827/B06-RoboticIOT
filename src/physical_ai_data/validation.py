@@ -138,6 +138,7 @@ def _load_tables(
     errors: list[ValidationMessage],
 ) -> dict[str, list[dict[str, str]]]:
     table_rows: dict[str, list[dict[str, str]]] = {name: [] for name in REQUIRED_TABLE_COLUMNS}
+    table_paths: dict[str, Path] = {}
     tables = manifest.get("tables")
     if not isinstance(tables, Mapping):
         errors.append(ValidationMessage("invalid_tables", "Manifest tables must be an object", "tables"))
@@ -153,7 +154,11 @@ def _load_tables(
                 )
             )
             continue
-        if not (root / table_ref).exists():
+        table_path = _resolve_package_relative_ref(root, table_ref, f"tables.{table_name}", errors, "invalid_table_ref")
+        if table_path is None:
+            continue
+        table_paths[str(table_name)] = table_path
+        if not table_path.exists():
             errors.append(ValidationMessage("missing_table", f"Missing table file: {table_ref}", table_ref))
 
     for table_name, required_columns in REQUIRED_TABLE_COLUMNS.items():
@@ -162,8 +167,8 @@ def _load_tables(
             if table_name not in tables:
                 errors.append(ValidationMessage("missing_table", f"Manifest tables.{table_name} is required", f"tables.{table_name}"))
             continue
-        table_path = root / table_ref
-        if not table_path.exists():
+        table_path = table_paths.get(table_name)
+        if table_path is None or not table_path.exists():
             continue
         rows = read_csv_rows(table_path)
         _validate_csv_rows(table_ref, rows, errors)
@@ -279,10 +284,35 @@ def _validate_numeric(
 def _validate_file_ref(root: Path, ref: object, path: str, errors: list[ValidationMessage]) -> None:
     if not isinstance(ref, str) or not ref:
         return
+    candidate = _resolve_package_relative_ref(root, ref, path, errors, "invalid_artifact_ref")
+    if candidate is None:
+        return
+
+    if not candidate.exists():
+        errors.append(ValidationMessage("missing_artifact_ref", f"Missing artifact referenced by {path}: {ref}", path))
+
+
+def _resolve_package_relative_ref(
+    root: Path,
+    ref: str,
+    path: str,
+    errors: list[ValidationMessage],
+    error_code: str,
+) -> Path | None:
     ref_path = Path(ref)
     if ref_path.is_absolute():
-        errors.append(ValidationMessage("invalid_artifact_ref", f"{path} must be package-relative, got absolute path: {ref}", path))
-        return
+        errors.append(ValidationMessage(error_code, f"{path} must be package-relative, got absolute path: {ref}", path))
+        return None
+
+    if ".." in ref_path.parts:
+        errors.append(
+            ValidationMessage(
+                error_code,
+                f"{path} must stay within package root and not use path traversal: {ref}",
+                path,
+            )
+        )
+        return None
 
     root_resolved = root.resolve()
     candidate = (root / ref_path).resolve(strict=False)
@@ -291,25 +321,13 @@ def _validate_file_ref(root: Path, ref: object, path: str, errors: list[Validati
     except ValueError:
         errors.append(
             ValidationMessage(
-                "invalid_artifact_ref",
+                error_code,
                 f"{path} must stay within package root and not use path traversal: {ref}",
                 path,
             )
         )
-        return
-
-    if ".." in ref_path.parts:
-        errors.append(
-            ValidationMessage(
-                "invalid_artifact_ref",
-                f"{path} must stay within package root and not use path traversal: {ref}",
-                path,
-            )
-        )
-        return
-
-    if not candidate.exists():
-        errors.append(ValidationMessage("missing_artifact_ref", f"Missing artifact referenced by {path}: {ref}", path))
+        return None
+    return candidate
 
 
 def _collect_ids(value: object, id_field: str) -> set[str]:

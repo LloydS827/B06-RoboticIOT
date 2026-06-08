@@ -139,6 +139,36 @@ def test_missing_declared_extra_table_reports_error(tmp_path: Path):
     assert any(error.code == "missing_table" and "missing_candidates.csv" in error.message for error in result.errors)
 
 
+def test_absolute_declared_table_ref_is_invalid_even_when_file_exists(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    outside_frames = tmp_path.parent / f"{tmp_path.name}_frames.csv"
+    outside_frames.write_text((tmp_path / "frames.csv").read_text(encoding="utf-8"), encoding="utf-8")
+    manifest_path = tmp_path / "physical_ai_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["tables"]["frames"] = str(outside_frames)
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_table_ref" and "absolute" in error.message for error in result.errors)
+
+
+def test_parent_directory_declared_table_ref_escape_is_invalid_even_when_file_exists(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    outside_candidates = tmp_path.parent / f"{tmp_path.name}_candidates.csv"
+    _write_csv(outside_candidates, ["candidate_id"], [{"candidate_id": "candidate_0000"}])
+    manifest_path = tmp_path / "physical_ai_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["tables"]["candidates"] = f"../{outside_candidates.name}"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_table_ref" and "package root" in error.message for error in result.errors)
+
+
 def test_non_empty_ref_must_exist(tmp_path: Path):
     _write_minimal_package(tmp_path)
     rows = list(csv.DictReader((tmp_path / "frames.csv").open(newline="", encoding="utf-8")))
