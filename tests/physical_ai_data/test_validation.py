@@ -151,6 +151,34 @@ def test_non_empty_ref_must_exist(tmp_path: Path):
     assert any(error.code == "missing_artifact_ref" for error in result.errors)
 
 
+def test_absolute_ref_is_invalid_even_when_file_exists(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    outside_file = tmp_path / "absolute.png"
+    outside_file.write_bytes(b"placeholder")
+    rows = list(csv.DictReader((tmp_path / "frames.csv").open(newline="", encoding="utf-8")))
+    rows[0]["image_ref"] = str(outside_file)
+    _write_csv(tmp_path / "frames.csv", list(rows[0].keys()), rows)
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_artifact_ref" and "absolute" in error.message for error in result.errors)
+
+
+def test_parent_directory_ref_escape_is_invalid_even_when_file_exists(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    outside_file = tmp_path.parent / f"{tmp_path.name}_outside.png"
+    outside_file.write_bytes(b"placeholder")
+    rows = list(csv.DictReader((tmp_path / "frames.csv").open(newline="", encoding="utf-8")))
+    rows[0]["image_ref"] = f"../{outside_file.name}"
+    _write_csv(tmp_path / "frames.csv", list(rows[0].keys()), rows)
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_artifact_ref" and "package root" in error.message for error in result.errors)
+
+
 def test_manifest_pose_ref_must_exist_when_non_empty(tmp_path: Path):
     _write_minimal_package(tmp_path)
     manifest = json.loads((tmp_path / "physical_ai_manifest.json").read_text(encoding="utf-8"))
@@ -161,6 +189,38 @@ def test_manifest_pose_ref_must_exist_when_non_empty(tmp_path: Path):
 
     assert not result.ok
     assert any(error.code == "missing_artifact_ref" and "pose_ref" in error.message for error in result.errors)
+
+
+def test_malformed_csv_row_reports_error_instead_of_crashing(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    rows = list(csv.DictReader((tmp_path / "frames.csv").open(newline="", encoding="utf-8")))
+    fieldnames = list(rows[0].keys())
+    with (tmp_path / "frames.csv").open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow(fieldnames)
+        writer.writerow([rows[0][field] for field in fieldnames] + ["extra-cell"])
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "malformed_csv_row" and "frames.csv" in error.message for error in result.errors)
+
+
+def test_manifest_devices_objects_and_timelines_must_be_lists(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    manifest_path = tmp_path / "physical_ai_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["devices"] = {"device_id": "robot_001", "type": "robot_arm"}
+    manifest["objects"] = {"object_id": "workpiece_001", "type": "workpiece"}
+    manifest["timelines"] = {"timeline_id": "sim_time", "unit": "s"}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "invalid_manifest_list" and error.path == "devices" for error in result.errors)
+    assert any(error.code == "invalid_manifest_list" and error.path == "objects" for error in result.errors)
+    assert any(error.code == "invalid_manifest_list" and error.path == "timelines" for error in result.errors)
 
 
 def test_events_and_metrics_timestamp_must_be_numeric(tmp_path: Path):
@@ -181,6 +241,24 @@ def test_events_and_metrics_timestamp_must_be_numeric(tmp_path: Path):
     assert not result.ok
     assert any(error.code == "invalid_timestamp" and "events.csv" in error.message for error in result.errors)
     assert any(error.code == "invalid_timestamp" and "metrics.csv" in error.message for error in result.errors)
+
+
+def test_label_target_refs_must_exist(tmp_path: Path):
+    _write_minimal_package(tmp_path)
+    _write_csv(
+        tmp_path / "labels.csv",
+        ["label_id", "label_type", "target_ref", "value", "confidence", "source"],
+        [
+            {"label_id": "label_0001", "label_type": "quality", "target_ref": "frame:missing", "value": "bad", "confidence": 1.0, "source": "sim"},
+            {"label_id": "label_0002", "label_type": "quality", "target_ref": "object:missing", "value": "bad", "confidence": 1.0, "source": "sim"},
+        ],
+    )
+
+    result = validate_package(tmp_path)
+
+    assert not result.ok
+    assert any(error.code == "unknown_frame_id" and "frame:missing" in error.message for error in result.errors)
+    assert any(error.code == "unknown_object_id" and "object:missing" in error.message for error in result.errors)
 
 
 def test_missing_recommended_artifact_directory_reports_warning(tmp_path: Path):

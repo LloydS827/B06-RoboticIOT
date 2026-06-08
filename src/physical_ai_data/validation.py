@@ -103,9 +103,9 @@ def _validate_manifest(root: Path, manifest: Mapping[str, object], errors: list[
 
     if not manifest.get("package_id", ""):
         errors.append(ValidationMessage("empty_id", "package_id must not be empty", "package_id"))
-    _validate_manifest_list_ids(manifest.get("devices"), "device_id", "devices", errors)
-    _validate_manifest_list_ids(manifest.get("objects"), "object_id", "objects", errors)
-    _validate_manifest_list_ids(manifest.get("timelines"), "timeline_id", "timelines", errors)
+    for field, id_field in (("devices", "device_id"), ("objects", "object_id"), ("timelines", "timeline_id")):
+        if field in manifest:
+            _validate_manifest_list_ids(manifest.get(field), id_field, field, errors)
 
     timelines = manifest.get("timelines")
     timeline_ids = _collect_ids(timelines, "timeline_id")
@@ -166,6 +166,7 @@ def _load_tables(
         if not table_path.exists():
             continue
         rows = read_csv_rows(table_path)
+        _validate_csv_rows(table_ref, rows, errors)
         table_rows[table_name] = rows
         columns = set(rows[0].keys()) if rows else _read_csv_header(table_path)
         missing_columns = [column for column in required_columns if column not in columns]
@@ -199,7 +200,7 @@ def _validate_rows(
                 ValidationMessage("unknown_coordinate_frame", f"frames.csv row {row_index} references unknown coordinate_frame_id", path)
             )
         for field, value in frame.items():
-            if field.endswith("_ref"):
+            if isinstance(field, str) and field.endswith("_ref"):
                 _validate_file_ref(root, value, f"{path}.{field}", errors)
 
     frame_ids = {row.get("frame_id", "") for row in table_rows.get("frames", [])}
@@ -218,7 +219,13 @@ def _validate_rows(
         path = f"labels.csv:{row_index}"
         _validate_non_empty_id(label, "label_id", path, errors)
         target_ref = label.get("target_ref", "")
-        if not (target_ref.startswith("frame:") or target_ref.startswith("object:")):
+        if target_ref.startswith("frame:"):
+            if target_ref.removeprefix("frame:") not in frame_ids:
+                errors.append(ValidationMessage("unknown_frame_id", f"labels.csv row {row_index} references unknown {target_ref}", path))
+        elif target_ref.startswith("object:"):
+            if target_ref.removeprefix("object:") not in object_ids:
+                errors.append(ValidationMessage("unknown_object_id", f"labels.csv row {row_index} references unknown {target_ref}", path))
+        else:
             errors.append(ValidationMessage("invalid_target_ref", f"labels.csv row {row_index} target_ref must start with frame: or object:", path))
 
     for row_index, metric in enumerate(table_rows.get("metrics", []), start=1):
@@ -246,6 +253,7 @@ def _validate_non_empty_id(row: Mapping[str, str], field: str, path: str, errors
 
 def _validate_manifest_list_ids(value: object, id_field: str, path: str, errors: list[ValidationMessage]) -> None:
     if not isinstance(value, list):
+        errors.append(ValidationMessage("invalid_manifest_list", f"{path} must be a list", path))
         return
     for index, item in enumerate(value):
         if not isinstance(item, Mapping):
@@ -271,7 +279,36 @@ def _validate_numeric(
 def _validate_file_ref(root: Path, ref: object, path: str, errors: list[ValidationMessage]) -> None:
     if not isinstance(ref, str) or not ref:
         return
-    if not (root / ref).exists():
+    ref_path = Path(ref)
+    if ref_path.is_absolute():
+        errors.append(ValidationMessage("invalid_artifact_ref", f"{path} must be package-relative, got absolute path: {ref}", path))
+        return
+
+    root_resolved = root.resolve()
+    candidate = (root / ref_path).resolve(strict=False)
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError:
+        errors.append(
+            ValidationMessage(
+                "invalid_artifact_ref",
+                f"{path} must stay within package root and not use path traversal: {ref}",
+                path,
+            )
+        )
+        return
+
+    if ".." in ref_path.parts:
+        errors.append(
+            ValidationMessage(
+                "invalid_artifact_ref",
+                f"{path} must stay within package root and not use path traversal: {ref}",
+                path,
+            )
+        )
+        return
+
+    if not candidate.exists():
         errors.append(ValidationMessage("missing_artifact_ref", f"Missing artifact referenced by {path}: {ref}", path))
 
 
@@ -293,6 +330,18 @@ def _default_summary() -> dict[str, object]:
     }
 
 
+def _validate_csv_rows(table_ref: str, rows: list[dict[str, str]], errors: list[ValidationMessage]) -> None:
+    for row_index, row in enumerate(rows, start=1):
+        if None in row:
+            errors.append(
+                ValidationMessage(
+                    "malformed_csv_row",
+                    f"{table_ref} row {row_index} has more values than header columns",
+                    f"{table_ref}:{row_index}",
+                )
+            )
+
+
 def _count_artifact_refs(manifest: Mapping[str, object], table_rows: Mapping[str, list[dict[str, str]]]) -> int:
     count = 0
     for frame in _as_list(manifest.get("coordinate_frames")):
@@ -300,7 +349,7 @@ def _count_artifact_refs(manifest: Mapping[str, object], table_rows: Mapping[str
             count += 1
     for rows in table_rows.values():
         for row in rows:
-            count += sum(1 for field, value in row.items() if field.endswith("_ref") and value)
+            count += sum(1 for field, value in row.items() if isinstance(field, str) and field.endswith("_ref") and value)
     return count
 
 
