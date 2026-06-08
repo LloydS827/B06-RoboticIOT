@@ -1,8 +1,10 @@
 # Simulation-first Physical AI Data Package Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking and are now marked complete.
 
 **Goal:** Build the Stage 3 simulation-first Physical AI data package prototype: CavLAB package v0.1 schema, validator, two simulation sample packages, Rerun adapter, candidate export, CLI, tests, and docs.
+
+**Completion note:** This plan has been executed. Final smoke results and remaining follow-up items are recorded in `docs/research/05-physical-ai数据包阶段三实施记录.md`.
 
 **Architecture:** Add a new `physical_ai_data` Python package beside the existing `rerun_stage2` experiment package. `physical_ai_data` owns the CavLAB package schema, package IO, validator, sample generators, candidate export, summary, Rerun adapter, and CLI; `rerun_stage2` remains the Stage 2 Rerun evaluation implementation. The default flow is: generate package -> validate package -> summarize/export candidates -> convert to Rerun `.rrd`.
 
@@ -77,7 +79,7 @@ Do not rename or delete existing `rerun_stage2` modules.
 - Create: `src/physical_ai_data/validation.py`
 - Create: `tests/physical_ai_data/test_validation.py`
 
-- [ ] **Step 1: Write failing validator tests**
+- [x] **Step 1: Write failing validator tests**
 
 Create `tests/physical_ai_data/test_validation.py`:
 
@@ -263,7 +265,7 @@ def test_timelines_must_include_sim_time(tmp_path: Path):
     assert any(error.code == "missing_sim_time" for error in result.errors)
 ```
 
-- [ ] **Step 2: Run validator tests and confirm they fail**
+- [x] **Step 2: Run validator tests and confirm they fail**
 
 Run:
 
@@ -273,7 +275,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_validation.py -q
 
 Expected: FAIL because `physical_ai_data` does not exist.
 
-- [ ] **Step 3: Implement schema constants and validation result types**
+- [x] **Step 3: Implement schema constants and validation result types**
 
 Create `src/physical_ai_data/__init__.py`:
 
@@ -295,7 +297,7 @@ Create `src/physical_ai_data/schema.py` with:
   - `ValidationResult(errors: list[ValidationMessage], warnings: list[ValidationMessage], summary: dict[str, object])`
   - `ValidationResult.ok` property returns `not errors`
 
-- [ ] **Step 4: Implement package IO helpers**
+- [x] **Step 4: Implement package IO helpers**
 
 Create `src/physical_ai_data/package_io.py`:
 
@@ -308,7 +310,7 @@ Create `src/physical_ai_data/package_io.py`:
 
 Keep helpers small and dependency-free.
 
-- [ ] **Step 5: Implement validator**
+- [x] **Step 5: Implement validator**
 
 Create `src/physical_ai_data/validation.py`:
 
@@ -333,7 +335,7 @@ Create `src/physical_ai_data/validation.py`:
 - Produce summary:
   - `package_id`, `scenario_type`, `frame_count`, `event_count`, `label_count`, `metric_count`, `artifact_ref_count`.
 
-- [ ] **Step 6: Run tests and confirm pass**
+- [x] **Step 6: Run tests and confirm pass**
 
 Run:
 
@@ -343,7 +345,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_validation.py -q
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 1**
+- [x] **Step 7: Commit Task 1**
 
 ```bash
 git add src/physical_ai_data/__init__.py src/physical_ai_data/schema.py src/physical_ai_data/package_io.py src/physical_ai_data/validation.py tests/physical_ai_data/test_validation.py
@@ -358,7 +360,7 @@ git commit -m "Add physical AI package validator"
 - Create: `tests/physical_ai_data/test_samples.py`
 - Modify: `src/physical_ai_data/package_io.py` if additional write helper is needed
 
-- [ ] **Step 1: Write failing sample generation tests**
+- [x] **Step 1: Write failing sample generation tests**
 
 Create `tests/physical_ai_data/test_samples.py`:
 
@@ -404,7 +406,7 @@ def test_generators_are_deterministic(tmp_path: Path):
     assert (first / "events.csv").read_text(encoding="utf-8") == (second / "events.csv").read_text(encoding="utf-8")
 ```
 
-- [ ] **Step 2: Run sample tests and confirm failure**
+- [x] **Step 2: Run sample tests and confirm failure**
 
 Run:
 
@@ -414,7 +416,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_samples.py -q
 
 Expected: FAIL because `physical_ai_data.samples` does not exist.
 
-- [ ] **Step 3: Implement welding package generator**
+- [x] **Step 3: Implement welding package generator**
 
 Create `generate_welding_package(root: str | Path, frame_count: int = 60, random_seed: int = 42) -> Path`.
 
@@ -441,7 +443,7 @@ Implementation guidance:
   - labels include at least one `quality` label;
   - metrics include `weld_current`, `weld_voltage`, `defect_probability`.
 
-- [ ] **Step 4: Implement pick/sort package generator**
+- [x] **Step 4: Implement pick/sort package generator**
 
 Create `generate_pick_sort_package(root: str | Path, frame_count: int = 40, random_seed: int = 42) -> Path`.
 
@@ -455,7 +457,7 @@ Required content:
 - metrics include `grip_confidence`, `object_confidence`
 - deterministic generated images under `artifacts/images/`
 
-- [ ] **Step 5: Run sample tests and confirm pass**
+- [x] **Step 5: Run sample tests and confirm pass**
 
 Run:
 
@@ -465,7 +467,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_samples.py -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Run validator tests again**
+- [x] **Step 6: Run validator tests again**
 
 Run:
 
@@ -475,7 +477,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_validation.py tests
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 git add src/physical_ai_data/samples.py src/physical_ai_data/package_io.py tests/physical_ai_data/test_samples.py
@@ -490,7 +492,7 @@ git commit -m "Add physical AI simulation package generators"
 - Modify: `src/physical_ai_data/package_io.py` if needed
 - Create: `tests/physical_ai_data/test_candidates.py`
 
-- [ ] **Step 1: Write failing candidate export tests**
+- [x] **Step 1: Write failing candidate export tests**
 
 Create `tests/physical_ai_data/test_candidates.py`:
 
@@ -541,7 +543,7 @@ def test_summarize_package_returns_counts(tmp_path: Path):
     assert summary["event_count"] >= 2
 ```
 
-- [ ] **Step 2: Run candidate tests and confirm failure**
+- [x] **Step 2: Run candidate tests and confirm failure**
 
 Run:
 
@@ -551,7 +553,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_candidates.py -q
 
 Expected: FAIL because `physical_ai_data.candidates` does not exist.
 
-- [ ] **Step 3: Implement candidate export**
+- [x] **Step 3: Implement candidate export**
 
 Create `src/physical_ai_data/candidates.py`:
 
@@ -571,7 +573,7 @@ Create `src/physical_ai_data/candidates.py`:
   - Merge duplicate frame-level candidates into one row with `source_type = "mixed"` and joined reasons.
   - Write columns exactly as `CANDIDATE_COLUMNS`.
 
-- [ ] **Step 4: Run candidate tests and confirm pass**
+- [x] **Step 4: Run candidate tests and confirm pass**
 
 Run:
 
@@ -581,7 +583,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_candidates.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Run related tests**
+- [x] **Step 5: Run related tests**
 
 Run:
 
@@ -591,7 +593,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_validation.py tests
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 git add src/physical_ai_data/candidates.py tests/physical_ai_data/test_candidates.py
@@ -605,7 +607,7 @@ git commit -m "Add physical AI candidate export"
 - Create: `src/physical_ai_data/rerun_adapter.py`
 - Create: `tests/physical_ai_data/test_rerun_adapter.py`
 
-- [ ] **Step 1: Write failing Rerun adapter tests**
+- [x] **Step 1: Write failing Rerun adapter tests**
 
 Create `tests/physical_ai_data/test_rerun_adapter.py`:
 
@@ -641,7 +643,7 @@ def test_write_pick_sort_rrd_and_verify(tmp_path: Path):
     assert verify.returncode == 0, verify.stderr + verify.stdout
 ```
 
-- [ ] **Step 2: Run adapter tests and confirm failure**
+- [x] **Step 2: Run adapter tests and confirm failure**
 
 Run:
 
@@ -651,7 +653,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_rerun_adapter.py -q
 
 Expected: FAIL because `physical_ai_data.rerun_adapter` does not exist.
 
-- [ ] **Step 3: Implement Rerun adapter**
+- [x] **Step 3: Implement Rerun adapter**
 
 Create `src/physical_ai_data/rerun_adapter.py`:
 
@@ -676,7 +678,7 @@ Create `src/physical_ai_data/rerun_adapter.py`:
   - `/package/<scenario_type>/events`
   - `/package/<scenario_type>/labels`
 
-- [ ] **Step 4: Run adapter tests and confirm pass**
+- [x] **Step 4: Run adapter tests and confirm pass**
 
 Run:
 
@@ -686,7 +688,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_rerun_adapter.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Run all physical_ai_data tests**
+- [x] **Step 5: Run all physical_ai_data tests**
 
 Run:
 
@@ -696,7 +698,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 4**
+- [x] **Step 6: Commit Task 4**
 
 ```bash
 git add src/physical_ai_data/rerun_adapter.py tests/physical_ai_data/test_rerun_adapter.py
@@ -711,7 +713,7 @@ git commit -m "Add physical AI Rerun adapter"
 - Create: `scripts/physical_ai_package.py`
 - Create: `tests/physical_ai_data/test_cli.py`
 
-- [ ] **Step 1: Write failing CLI tests**
+- [x] **Step 1: Write failing CLI tests**
 
 Create `tests/physical_ai_data/test_cli.py`:
 
@@ -797,7 +799,7 @@ def test_cli_invalid_package_returns_nonzero(tmp_path: Path):
     assert "missing_manifest" in validate.stdout or "missing_manifest" in validate.stderr
 ```
 
-- [ ] **Step 2: Run CLI tests and confirm failure**
+- [x] **Step 2: Run CLI tests and confirm failure**
 
 Run:
 
@@ -807,7 +809,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_cli.py -q
 
 Expected: FAIL because CLI does not exist.
 
-- [ ] **Step 3: Implement CLI**
+- [x] **Step 3: Implement CLI**
 
 Create `src/physical_ai_data/cli.py` using `argparse`.
 
@@ -838,7 +840,7 @@ if __name__ == "__main__":
     raise SystemExit(main())
 ```
 
-- [ ] **Step 4: Run CLI tests and confirm pass**
+- [x] **Step 4: Run CLI tests and confirm pass**
 
 Run:
 
@@ -848,7 +850,7 @@ PYTHONPATH=src python3 -m pytest tests/physical_ai_data/test_cli.py -q
 
 Expected: PASS.
 
-- [ ] **Step 5: Run all tests**
+- [x] **Step 5: Run all tests**
 
 Run:
 
@@ -858,7 +860,7 @@ PYTHONPATH=src python3 -m pytest -q
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit Task 5**
+- [x] **Step 6: Commit Task 5**
 
 ```bash
 git add src/physical_ai_data/cli.py scripts/physical_ai_package.py tests/physical_ai_data/test_cli.py
@@ -874,7 +876,7 @@ git commit -m "Add physical AI package CLI"
 - Modify: `README.md`
 - Modify: `details.md`
 
-- [ ] **Step 1: Write Stage 3 run docs**
+- [x] **Step 1: Write Stage 3 run docs**
 
 Create `docs/stage3/README.md` in Chinese with:
 
@@ -927,7 +929,7 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py convert-rerun artifacts/st
   - Rerun is adapter backend.
   - Validator is dev diagnostics, not production governance.
 
-- [ ] **Step 2: Create Stage 3 implementation record**
+- [x] **Step 2: Create Stage 3 implementation record**
 
 Create `docs/research/05-physical-ai数据包阶段三实施记录.md` in Chinese with sections:
 
@@ -943,7 +945,7 @@ Create `docs/research/05-physical-ai数据包阶段三实施记录.md` in Chines
 
 Only claim smoke results after Step 4 has actually run.
 
-- [ ] **Step 3: Update README and details**
+- [x] **Step 3: Update README and details**
 
 Modify `README.md`:
 
@@ -956,7 +958,7 @@ Modify `details.md`:
 - Add dated implementation completion bullets.
 - Update next steps.
 
-- [ ] **Step 4: Run final smoke commands**
+- [x] **Step 4: Run final smoke commands**
 
 Run:
 
@@ -983,11 +985,11 @@ Expected:
 - Both candidate CSV files exist.
 - Both `.rrd` files verify without error.
 
-- [ ] **Step 5: Update implementation record with real results**
+- [x] **Step 5: Update implementation record with real results**
 
 After Step 4, update `docs/research/05-physical-ai数据包阶段三实施记录.md` with exact observed results and any warnings. Do not claim GUI Viewer/Blueprint manual inspection unless actually performed.
 
-- [ ] **Step 6: Run docs/status checks**
+- [x] **Step 6: Run docs/status checks**
 
 Run:
 
@@ -1003,7 +1005,7 @@ Expected:
 - No whitespace errors.
 - Only intended files are modified.
 
-- [ ] **Step 7: Commit Task 6**
+- [x] **Step 7: Commit Task 6**
 
 ```bash
 git add README.md details.md docs/stage3/README.md docs/research/05-physical-ai数据包阶段三实施记录.md
