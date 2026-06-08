@@ -38,7 +38,7 @@ def export_candidates(package_root: str | Path, output_csv: str | Path | None = 
     tables = _read_package_tables(root, manifest)
     frames = tables["frames"]
     frame_timestamps = {row.get("frame_id", ""): row.get("timestamp_s", "") for row in frames}
-    sim_time_frames = [row for row in frames if row.get("timeline", "") == "sim_time"] or frames
+    sim_time_frames = [row for row in frames if row.get("timeline", "") == "sim_time"]
 
     candidates = []
     candidates.extend(_event_candidates(tables["events"], sim_time_frames))
