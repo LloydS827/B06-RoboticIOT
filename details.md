@@ -47,14 +47,23 @@
 - 新增阶段 2 技术评测报告：`docs/research/04-rerun阶段二本地技术评测报告.md`。
 - 更新 Rerun 二次开发路线判断矩阵，补充阶段 2 验证状态。
 
+### 2026-06-08
+
+- 确认后续工作继续采用 simulation-first 路线，不接真机，先通过仿真数据把 Physical AI 数据层的产品形态、数据模型和验证闭环跑清楚。
+- 确认阶段 3 采用“一个深度主场景 + 一个轻量对照场景”的设计：主场景为机器人焊接工站，轻量对照为机械臂抓取/分拣，移动机器人巡检暂缓。
+- 确认阶段 3 输出不能只是文档，需要包含自有数据包 schema、开发期 validator、Rerun adapter、两个仿真样例和最小候选导出能力。
+- 新增阶段 3 设计文档：`docs/superpowers/specs/2026-06-08-simulation-first-physical-ai-data-package-design.md`。
+- 阶段 3 设计文档已完成三轮 spec review，并根据评审意见补充 `rerun` 可选性、坐标系结构、引用约定、候选帧归属、`sim_time` 默认规则和候选 CSV 最小列。
+
 ## 下一步计划
 
-1. 按 `docs/stage2/viewer_blueprint_checklist.md` 完成 Viewer/Blueprint 人工视觉检查，并记录截图、布局保存结果和异常。
-2. 对阶段 2 输出做一次轻量性能冒烟，至少记录长帧数、较大点云、图像序列写入和打开体验。
-3. 继续寻找更贴近机器人焊接或工业工站的公开数据源；如果找不到，则扩展模拟数据覆盖更真实的工艺异常、传感器噪声和质量标签。
-4. 启动 CavLAB 自有数据包 schema 草案，定义任务上下文、设备、工件、工艺、事件、质量、坐标系和数据血缘。
-5. 将 importer 原型升级为可配置的数据包转换器，但继续把 Rerun 依赖隔离在外围。
-6. 阶段三前明确真实样板场景的最小字段清单、现场数据采集边界和验收样例。
+1. 请用户 review 阶段 3 设计文档，确认是否按该 spec 进入 implementation plan。
+2. 按 superpowers writing-plans 流程撰写阶段 3 implementation plan。
+3. 实现 CavLAB Physical AI 数据包 v0.1 的 schema/validator 原型。
+4. 生成机器人焊接工站和机械臂抓取/分拣两个仿真样例包。
+5. 实现 Rerun adapter，将自有数据包转换为 `.rrd` 并通过 CLI 校验。
+6. 实现最小候选样本导出，并更新 README、details 和阶段报告。
+7. 阶段 3 implementation 之后，再补充 Viewer/Blueprint 人工检查和性能冒烟记录。
 
 ## 维护约定
 
