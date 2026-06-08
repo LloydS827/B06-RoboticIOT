@@ -56,16 +56,22 @@
 - 阶段 3 设计文档已完成三轮 spec review，并根据评审意见补充 `rerun` 可选性、坐标系结构、引用约定、候选帧归属、`sim_time` 默认规则和候选 CSV 最小列。
 - 新增阶段 3 实施计划：`docs/superpowers/plans/2026-06-08-simulation-first-physical-ai-data-package.md`。
 - 阶段 3 实施计划已完成三轮 plan review，修正 validator warning、`_ref` 校验范围、events/metrics 时间戳校验和 smoke/final verification 环境可复现性问题。
+- 完成阶段 3 implementation 初稿：新增 `physical_ai_data` Python package，形成 CavLAB Physical AI 数据包 v0.1 的 schema/validator、package IO、候选导出、Rerun adapter 和 CLI prototype。
+- 完成两个仿真样例生成能力：机器人焊接工站 `robot_welding_station` 和机械臂抓取/分拣 `arm_pick_sort`。
+- 完成 candidate export，默认输出 `PACKAGE/derived/candidates.csv`，用于人工复核、训练样本筛选和评测样本整理。
+- 完成 Rerun adapter，将通过 validator 的 CavLAB package 转换为 `.rrd`；Rerun 在阶段 3 中定位为 adapter backend，不是业务 schema。
+- 完成 Stage 3 CLI：`generate`、`validate`、`summarize`、`export-candidates`、`convert-rerun`。
+- 测试和复核进展：已形成 `tests/physical_ai_data/` 单元测试覆盖；最终 smoke、Viewer/Blueprint 人工检查和性能冒烟仍需补充。
+- 新增阶段 3 运行说明：`docs/stage3/README.md`。
+- 新增阶段 3 实施记录：`docs/research/05-physical-ai数据包阶段三实施记录.md`。
 
 ## 下一步计划
 
-1. 使用 sub-agent 方式执行阶段 3 implementation plan。
-2. 实现 CavLAB Physical AI 数据包 v0.1 的 schema/validator 原型。
-3. 生成机器人焊接工站和机械臂抓取/分拣两个仿真样例包。
-4. 实现候选样本导出和数据包 summary。
-5. 实现 Rerun adapter，将自有数据包转换为 `.rrd` 并通过 CLI 校验。
-6. 完成 Stage 3 CLI、运行说明和实施记录。
-7. 阶段 3 implementation 之后，再补充 Viewer/Blueprint 人工检查和性能冒烟记录。
+1. 执行阶段 3 最终 smoke，覆盖两个样例包的 generate、validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify`。
+2. 根据最终 smoke 的真实输出校准 `docs/stage3/README.md` 和阶段 3 实施记录，补充 validator、Rerun adapter 和候选导出结果。
+3. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
+4. 补充性能冒烟，覆盖更长帧数、更大 artifact、`.rrd` 文件体积和基本打开体验。
+5. 进入阶段 4：收敛 CavLAB 自有规范、SDK wrapper、external importer 边界、数据包目录结构和 Rerun 后端替换边界。
 
 ## 维护约定
 
