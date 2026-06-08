@@ -61,17 +61,16 @@
 - 完成 candidate export，默认输出 `PACKAGE/derived/candidates.csv`，用于人工复核、训练样本筛选和评测样本整理。
 - 完成 Rerun adapter，将通过 validator 的 CavLAB package 转换为 `.rrd`；Rerun 在阶段 3 中定位为 adapter backend，不是业务 schema。
 - 完成 Stage 3 CLI：`generate`、`validate`、`summarize`、`export-candidates`、`convert-rerun`。
-- 测试和复核进展：已形成 `tests/physical_ai_data/` 单元测试覆盖；最终 smoke、Viewer/Blueprint 人工检查和性能冒烟仍需补充。
+- 测试和复核进展：已形成 `tests/physical_ai_data/` 单元测试覆盖，并完成最终 smoke；Viewer/Blueprint 人工检查和性能冒烟仍需补充。
+- 阶段 3 最终 smoke 结果：`PYTHONPATH=src python3 -m pytest -q` 返回 `68 passed`；两个 24 帧样例包均生成、校验、汇总、导出候选 CSV、转换 `.rrd` 成功，两个 `.rrd` 均通过 `rerun rrd verify`。
 - 新增阶段 3 运行说明：`docs/stage3/README.md`。
 - 新增阶段 3 实施记录：`docs/research/05-physical-ai数据包阶段三实施记录.md`。
 
 ## 下一步计划
 
-1. 执行阶段 3 最终 smoke，覆盖两个样例包的 generate、validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify`。
-2. 根据最终 smoke 的真实输出校准 `docs/stage3/README.md` 和阶段 3 实施记录，补充 validator、Rerun adapter 和候选导出结果。
-3. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
-4. 补充性能冒烟，覆盖更长帧数、更大 artifact、`.rrd` 文件体积和基本打开体验。
-5. 进入阶段 4：收敛 CavLAB 自有规范、SDK wrapper、external importer 边界、数据包目录结构和 Rerun 后端替换边界。
+1. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
+2. 补充性能冒烟，覆盖更长帧数、更大 artifact、`.rrd` 文件体积和基本打开体验。
+3. 进入阶段 4：收敛 CavLAB 自有规范、SDK wrapper、external importer 边界、数据包目录结构和 Rerun 后端替换边界。
 
 ## 维护约定
 

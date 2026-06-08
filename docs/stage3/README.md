@@ -40,7 +40,7 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py summarize artifacts/stage3
 PYTHONPATH=src python3 scripts/physical_ai_package.py summarize artifacts/stage3/pick_sort_demo --json
 ```
 
-`summarize` 输出 package id、场景类型、帧数、事件数、标签数、指标数和候选样本数等概要信息。
+`summarize` 输出 package id、场景类型、帧数、事件数、标签数、指标数、artifact 引用数、phase、事件类型、标签类型和指标名等概要信息。
 
 ## 导出候选样本
 
@@ -59,6 +59,13 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py convert-rerun artifacts/st
 ```
 
 该命令通过 Rerun adapter backend 将 CavLAB 自有数据包转换为 `.rrd`，便于继续使用 Rerun Viewer 和 CLI 做开发期观察。
+
+可使用 Rerun CLI 校验生成结果：
+
+```bash
+rerun rrd verify artifacts/stage3/weld_demo.rrd
+rerun rrd verify artifacts/stage3/pick_sort_demo.rrd
+```
 
 ## 已知限制
 

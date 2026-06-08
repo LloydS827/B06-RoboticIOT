@@ -47,7 +47,19 @@ rerun rrd verify artifacts/stage3/final_weld.rrd
 rerun rrd verify artifacts/stage3/final_pick_sort.rrd
 ```
 
-smoke 结果：待最终烟测后更新。
+最终 smoke 结果：
+
+- `PYTHONPATH=src python3 -m pytest -q`：`68 passed in 2.10s`。
+- 两个样例包均生成成功：
+  - `artifacts/stage3/final_weld`
+  - `artifacts/stage3/final_pick_sort`
+- 两个样例包 `validate --json` 均返回 `"ok": true`，`errors` 和 `warnings` 均为空。
+- 两个样例包均完成 `summarize --json`。
+- 两个样例包均生成 `derived/candidates.csv`。
+- 两个样例包均转换为 `.rrd`：
+  - `artifacts/stage3/final_weld.rrd`
+  - `artifacts/stage3/final_pick_sort.rrd`
+- 两个 `.rrd` 均通过 `rerun rrd verify`，输出均为 `1 file verified without error.`。
 
 ## 4. 两个仿真样例说明
 
@@ -59,19 +71,36 @@ smoke 结果：待最终烟测后更新。
 
 validator 已实现为开发期诊断入口，覆盖缺失 manifest、schema version、必需字段、必需表列、非数值/非有限数值、缺失 artifact 引用、缺失 `sim_time`、坐标系引用、对象引用和推荐目录 warning 等检查。
 
-已知单元测试覆盖 validator 的正常包和多类失败路径。最终 smoke 中两个样例包的实际 `validate --json` 输出待最终烟测后更新。
+已知单元测试覆盖 validator 的正常包和多类失败路径。最终 smoke 中两个样例包的实际 `validate --json` 结果如下：
+
+| 样例包 | 场景 | 帧数 | 事件数 | 标签数 | 指标数 | artifact 引用数 | 结果 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| `artifacts/stage3/final_weld` | `robot_welding_station` | 24 | 3 | 2 | 72 | 74 | `ok: true` |
+| `artifacts/stage3/final_pick_sort` | `arm_pick_sort` | 24 | 3 | 1 | 48 | 73 | `ok: true` |
+
+两个样例包的 `errors` 和 `warnings` 均为空。
 
 ## 6. Rerun adapter 结果
 
 Rerun adapter 已实现为 backend adapter：输入通过 validator 的 CavLAB package，输出 `.rrd`，用于开发期回放和观察。它不改变 CavLAB package schema，也不把 Rerun 数据模型作为业务数据模型。
 
-`.rrd` 文件生成和 `rerun rrd verify` 的最终结果待最终烟测后更新。Viewer/Blueprint 人工检查尚未完成，本文不声明 GUI 视觉验收结果。
+最终 smoke 已生成：
+
+- `artifacts/stage3/final_weld.rrd`，约 159 KB。
+- `artifacts/stage3/final_pick_sort.rrd`，约 154 KB。
+
+两个文件均通过 `rerun rrd verify`，CLI 输出均为 `1 file verified without error.`。Viewer/Blueprint 人工检查尚未完成，本文不声明 GUI 视觉验收结果。
 
 ## 7. 候选导出结果
 
 候选导出已实现，默认输出 `PACKAGE/derived/candidates.csv`。导出逻辑从事件、标签和指标中整理候选帧，合并同一帧的多来源原因，为人工复核、训练样本筛选和评测样本整理提供最小入口。
 
-两个最终样例包的候选 CSV 文件存在性、行数和样例内容待最终烟测后更新。
+最终 smoke 已生成：
+
+- `artifacts/stage3/final_weld/derived/candidates.csv`：6 行，包含 1 行表头和 5 行候选。
+- `artifacts/stage3/final_pick_sort/derived/candidates.csv`：23 行，包含 1 行表头和 22 行候选。
+
+焊接样例候选包含 `defect_probability`、`porosity_risk`、质量标签和合并候选；抓取/分拣样例候选包含 `object_confidence`、`grip_confidence` 以及多指标合并候选。
 
 ## 8. 风险与限制
 
@@ -84,8 +113,6 @@ Rerun adapter 已实现为 backend adapter：输入通过 validator 的 CavLAB p
 
 ## 9. 下一步
 
-1. 执行最终 smoke，并回填 validator、Rerun adapter 和候选导出的实际结果。
-2. 按真实输出校准 Stage 3 文档，避免运行说明和 CLI 行为漂移。
-3. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察结果、截图和布局问题。
-4. 补充性能冒烟，覆盖更长帧数、更大 artifact 和 `.rrd` 体积。
-5. 进入阶段四，围绕自有规范、SDK wrapper、importer 边界、数据包目录规范和后端替换边界继续收敛。
+1. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察结果、截图和布局问题。
+2. 补充性能冒烟，覆盖更长帧数、更大 artifact 和 `.rrd` 体积。
+3. 进入阶段四，围绕自有规范、SDK wrapper、importer 边界、数据包目录规范和后端替换边界继续收敛。
