@@ -89,6 +89,10 @@ def test_import_lerobot_episode_creates_valid_physical_ai_package(tmp_path: Path
     assert manifest["source_dataset"]["fps"] == 10.0
     assert manifest["source_dataset"]["frame_count"] == 2
     assert "converted_at" in manifest["source_dataset"]
+    assert manifest["objects"] == [
+        {"object_id": "block", "type": "object"},
+        {"object_id": "target", "type": "target"},
+    ]
     assert (package / "artifacts" / "source" / "lerobot_features.json").exists()
     assert (package / "artifacts" / "source" / "lerobot_stats.json").exists()
     assert (package / "artifacts" / "source" / "lerobot_episode_metadata.json").exists()
@@ -97,7 +101,7 @@ def test_import_lerobot_episode_creates_valid_physical_ai_package(tmp_path: Path
     assert (package / "README.md").exists()
     assert len(frames) == 2
     assert frames[0]["timeline"] == "sim_time"
-    assert frames[0]["phase"] == "episode"
+    assert frames[0]["phase"] == "pushing"
     assert frames[0]["image_ref"] == "artifacts/images/front/frame_0000.png"
     assert frames[0]["source_frame_index"] == "0"
     assert json.loads(frames[0]["image_refs_json"]) == {"front": "artifacts/images/front/frame_0000.png"}
@@ -110,10 +114,53 @@ def test_import_lerobot_episode_creates_valid_physical_ai_package(tmp_path: Path
     assert state_action[0]["state_json"] == "[0.1, 0.2, 0.3, 0.4]"
 
 
+def test_import_lerobot_episode_adds_fallback_profile_warning(tmp_path: Path):
+    episode = _episode(tmp_path)
+    fallback_episode = LeRobotEpisode(
+        repo_id="unknown/repo",
+        episode_index=episode.episode_index,
+        fps=episode.fps,
+        task_name=episode.task_name,
+        profile="fallback",
+        root=episode.root,
+        features=episode.features,
+        stats=episode.stats,
+        episode_metadata=episode.episode_metadata,
+        task_metadata=episode.task_metadata,
+        frames=episode.frames,
+    )
+
+    package = import_lerobot_episode(fallback_episode, tmp_path / "package", max_frames=None)
+    manifest = json.loads((package / "physical_ai_manifest.json").read_text(encoding="utf-8"))
+    frames = _rows(package / "frames.csv")
+    events = _rows(package / "events.csv")
+
+    assert validate_package(package).ok
+    assert manifest["source_dataset"]["profile"] == "fallback"
+    assert manifest["objects"] == [{"object_id": "task_object", "type": "object"}]
+    assert frames[0]["phase"] == "episode"
+    assert any(
+        row["event_type"] == "profile_fallback" and row["severity"] == "warning"
+        for row in events
+    )
+
+
 def test_import_lerobot_episode_respects_max_frames(tmp_path: Path):
     package = import_lerobot_episode(_episode(tmp_path), tmp_path / "package", max_frames=1)
 
     assert validate_package(package).summary["frame_count"] == 1
+
+
+def test_imported_lerobot_metrics_can_export_candidates(tmp_path: Path):
+    package = import_lerobot_episode(_episode(tmp_path), tmp_path / "package", max_frames=None)
+
+    from physical_ai_data.candidates import export_candidates
+
+    output = export_candidates(package, min_score=0.5)
+    rows = _rows(output)
+
+    assert rows
+    assert any("action_delta" in row["reasons"] for row in rows)
 
 
 def test_import_lerobot_episode_rejects_missing_primary_camera(tmp_path: Path):

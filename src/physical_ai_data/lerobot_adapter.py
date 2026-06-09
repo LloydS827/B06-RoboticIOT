@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping, Sequence
 
+from physical_ai_data.lerobot_profiles import LeRobotProfile, select_lerobot_profile
 from physical_ai_data.package_io import ensure_dir, write_csv_rows, write_json
 from physical_ai_data.schema import REQUIRED_TABLE_COLUMNS, SCHEMA_VERSION
 
@@ -54,6 +55,7 @@ def import_lerobot_episode(
     if not math.isfinite(episode.fps) or episode.fps <= 0:
         raise ValueError("fps must be positive")
 
+    profile = select_lerobot_profile(episode.repo_id, episode.profile)
     package_root = Path(output_dir)
     selected_frames = list(episode.frames[:max_frames])
     if primary_camera and selected_frames and not any(primary_camera in frame.images for frame in selected_frames):
@@ -64,9 +66,9 @@ def import_lerobot_episode(
     for index, frame in enumerate(selected_frames):
         image_refs_by_frame.append(_copy_frame_images(package_root, frame, index, copy_images=copy_images))
 
-    frame_rows = _frame_rows(episode, selected_frames, image_refs_by_frame, primary_camera)
-    event_rows = _event_rows(frame_rows)
-    label_rows = _label_rows(episode, frame_rows)
+    frame_rows = _frame_rows(episode, profile, selected_frames, image_refs_by_frame, primary_camera)
+    event_rows = _event_rows(frame_rows, profile)
+    label_rows = _label_rows(episode, profile, frame_rows)
     metric_rows = _metric_rows(selected_frames, frame_rows)
     state_action_rows = _state_action_rows(selected_frames, frame_rows)
 
@@ -77,12 +79,12 @@ def import_lerobot_episode(
     write_json(source_root / "lerobot_task_metadata.json", dict(episode.task_metadata))
     write_csv_rows(source_root / "frame_state_action.csv", STATE_ACTION_COLUMNS, state_action_rows)
 
-    write_json(package_root / MANIFEST_FILENAME, _manifest(episode, len(selected_frames)))
+    write_json(package_root / MANIFEST_FILENAME, _manifest(episode, profile, len(selected_frames)))
     write_csv_rows(package_root / "frames.csv", REQUIRED_TABLE_COLUMNS["frames"] + FRAME_EXTENSIONS, frame_rows)
     write_csv_rows(package_root / "events.csv", REQUIRED_TABLE_COLUMNS["events"], event_rows)
     write_csv_rows(package_root / "labels.csv", REQUIRED_TABLE_COLUMNS["labels"], label_rows)
     write_csv_rows(package_root / "metrics.csv", REQUIRED_TABLE_COLUMNS["metrics"], metric_rows)
-    _write_readme(package_root / "README.md", episode, len(selected_frames))
+    _write_readme(package_root / "README.md", episode, profile, len(selected_frames))
     return package_root
 
 
@@ -132,6 +134,7 @@ def _copy_frame_images(
 
 def _frame_rows(
     episode: LeRobotEpisode,
+    profile: LeRobotProfile,
     frames: Sequence[LeRobotFrame],
     image_refs_by_frame: Sequence[dict[str, str]],
     primary_camera: str | None,
@@ -145,7 +148,7 @@ def _frame_rows(
                 "frame_id": _frame_id(output_index),
                 "timestamp_s": _timestamp_s(frame, episode.fps),
                 "timeline": "sim_time",
-                "phase": "episode",
+                "phase": profile.phase,
                 "coordinate_frame_id": "robot_base",
                 "robot_state_ref": "artifacts/source/frame_state_action.csv",
                 "tcp_pose_ref": "",
@@ -159,16 +162,37 @@ def _frame_rows(
     return rows
 
 
-def _event_rows(frame_rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+def _event_rows(frame_rows: Sequence[Mapping[str, object]], profile: LeRobotProfile) -> list[dict[str, object]]:
     if not frame_rows:
         return []
-    return [
+    rows = [
         _event_row("event_0000", frame_rows[0]["timestamp_s"], "episode_start", "info", "LeRobot episode import started", frame_rows[0]["frame_id"]),
-        _event_row("event_0001", frame_rows[-1]["timestamp_s"], "episode_end", "info", "LeRobot episode import ended", frame_rows[-1]["frame_id"]),
     ]
+    if profile.name == "fallback":
+        rows.append(
+            _event_row(
+                f"event_{len(rows):04d}",
+                frame_rows[0]["timestamp_s"],
+                "profile_fallback",
+                "warning",
+                "Using conservative LeRobot profile fallback mapping",
+                frame_rows[0]["frame_id"],
+            )
+        )
+    rows.append(
+        _event_row(
+            f"event_{len(rows):04d}",
+            frame_rows[-1]["timestamp_s"],
+            "episode_end",
+            "info",
+            "LeRobot episode import ended",
+            frame_rows[-1]["frame_id"],
+        )
+    )
+    return rows
 
 
-def _label_rows(episode: LeRobotEpisode, frame_rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
+def _label_rows(episode: LeRobotEpisode, profile: LeRobotProfile, frame_rows: Sequence[Mapping[str, object]]) -> list[dict[str, object]]:
     if not frame_rows:
         return []
     return [
@@ -176,7 +200,7 @@ def _label_rows(episode: LeRobotEpisode, frame_rows: Sequence[Mapping[str, objec
             "label_id": "label_0000",
             "label_type": "task_context",
             "target_ref": f"frame:{frame_rows[0]['frame_id']}",
-            "value": episode.task_name or episode.profile,
+            "value": episode.task_name or profile.name,
             "confidence": 1.0,
             "source": "lerobot_import",
         }
@@ -218,15 +242,15 @@ def _state_action_rows(frames: Sequence[LeRobotFrame], frame_rows: Sequence[Mapp
     return rows
 
 
-def _manifest(episode: LeRobotEpisode, frame_count: int) -> dict[str, object]:
+def _manifest(episode: LeRobotEpisode, profile: LeRobotProfile, frame_count: int) -> dict[str, object]:
     return {
         "schema_version": SCHEMA_VERSION,
-        "package_id": _package_id(episode),
+        "package_id": _package_id(episode, profile),
         "scenario_type": "open_robot_manipulation",
         "created_at": _utc_now(),
         "task": {"task_id": f"episode_{episode.episode_index}", "name": episode.task_name or "LeRobot episode"},
         "devices": _devices(episode),
-        "objects": [{"object_id": "task_object", "type": "object"}],
+        "objects": profile.object_ids(),
         "coordinate_frames": [
             {"frame_id": "station", "parent_frame_id": "", "pose_ref": ""},
             {"frame_id": "robot_base", "parent_frame_id": "station", "pose_ref": ""},
@@ -244,16 +268,16 @@ def _manifest(episode: LeRobotEpisode, frame_count: int) -> dict[str, object]:
             "trajectories": "artifacts/trajectories",
             "source": "artifacts/source",
         },
-        "source_dataset": _source_dataset(episode, frame_count),
+        "source_dataset": _source_dataset(episode, profile, frame_count),
     }
 
 
-def _source_dataset(episode: LeRobotEpisode, frame_count: int) -> dict[str, object]:
+def _source_dataset(episode: LeRobotEpisode, profile: LeRobotProfile, frame_count: int) -> dict[str, object]:
     source_dataset: dict[str, object] = {
         "format": "lerobot",
         "repo_id": episode.repo_id,
         "episode_index": episode.episode_index,
-        "profile": episode.profile,
+        "profile": profile.name,
         "feature_schema_ref": "artifacts/source/lerobot_features.json",
         "stats_ref": "artifacts/source/lerobot_stats.json",
         "episode_metadata_ref": "artifacts/source/lerobot_episode_metadata.json",
@@ -339,16 +363,16 @@ def _frame_id(index: int) -> str:
     return f"frame_{index:04d}"
 
 
-def _package_id(episode: LeRobotEpisode) -> str:
+def _package_id(episode: LeRobotEpisode, profile: LeRobotProfile) -> str:
     repo_id = "".join(character if character.isalnum() else "_" for character in episode.repo_id).strip("_")
-    return f"lerobot_{repo_id}_episode_{episode.episode_index}_{episode.profile}"
+    return f"lerobot_{repo_id}_episode_{episode.episode_index}_{profile.name}"
 
 
 def _utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def _write_readme(path: Path, episode: LeRobotEpisode, frame_count: int) -> None:
+def _write_readme(path: Path, episode: LeRobotEpisode, profile: LeRobotProfile, frame_count: int) -> None:
     ensure_dir(path.parent)
     path.write_text(
         "\n".join(
@@ -358,7 +382,7 @@ def _write_readme(path: Path, episode: LeRobotEpisode, frame_count: int) -> None
                 f"- Source format: LeRobot",
                 f"- Repository: {episode.repo_id}",
                 f"- Episode: {episode.episode_index}",
-                f"- Profile: {episode.profile}",
+                f"- Profile: {profile.name}",
                 f"- Frames: {frame_count}",
                 "",
             ]

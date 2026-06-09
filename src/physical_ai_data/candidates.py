@@ -9,7 +9,16 @@ from physical_ai_data.schema import CANDIDATE_COLUMNS, ValidationMessage
 from physical_ai_data.validation import MANIFEST_FILENAME, validate_package
 
 EVENT_KEYWORDS = ("warning", "error", "risk", "failure", "success")
-METRIC_KEYWORDS = ("probability", "confidence", "risk", "score", "success")
+METRIC_KEYWORDS = (
+    "probability",
+    "confidence",
+    "risk",
+    "score",
+    "success",
+    "action_delta",
+    "timestamp_gap",
+    "image_missing",
+)
 
 
 def summarize_package(package_root: str | Path) -> dict[str, object]:
