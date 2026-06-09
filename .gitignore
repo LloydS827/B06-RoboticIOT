@@ -20,6 +20,8 @@ build/
 .env
 .env.*
 !.env.example
+.worktrees
+.worktrees/
 
 # Stage 2 generated artifacts
 artifacts/
