@@ -23,62 +23,61 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 
 ## Stage 4.1 uv 环境
 
-- 状态：阻塞，未完成环境基线；未标记 Stage 4.1 完成。
+- 状态：Task 1 环境基线已建立；本任务未运行真实 LeRobot 数据 import，PushT quick/full 和 ALOHA smoke 仍待后续任务执行。
 - 工作区检查：`git status --short` 初始输出为空，未发现需要保留的既有改动。
 - `uv` 可用性：
   - `command -v uv`：`/Users/lloyd/.local/bin/uv`
   - `uv --version`：`uv 0.11.17 (a33a629d6 2026-05-28 aarch64-apple-darwin)`
-- 环境同步命令：`uv sync --extra dev --extra lerobot`
-- 环境同步结果：失败，未生成 `uv.lock`；`.venv/` 仅留下 68K 的半初始化本地环境目录。
-- 解析失败核心原因：项目默认依赖 `rerun-sdk[dataplatform]>=0.33.0`，而当前可解析的 LeRobot 版本要求较旧的 `rerun-sdk`：
+- 初始解析失败核心原因：项目默认依赖 `rerun-sdk[dataplatform]>=0.33.0`，而当前可解析的 LeRobot 版本要求较旧的 `rerun-sdk`：
   - `lerobot>=0.3.0,<0.4.0` 依赖 `rerun-sdk>=0.21.0,<0.23.0`
   - `lerobot>=0.4.0` 依赖 `rerun-sdk>=0.24.0,<0.27.0`
   - 因此 `b06-physical-ai-data-layer[lerobot]` 与项目已有 `rerun-sdk[dataplatform]>=0.33.0` 约束不可同时满足。
-- `uv sync` exact error 摘要：
-
-```text
-Using CPython 3.13.5 interpreter at: /Users/lloyd/miniconda3/bin/python3
-Creating virtual environment at: .venv
-  × No solution found when resolving dependencies for split (markers:
-  │ python_full_version >= '3.14'):
-  ╰─▶ Because only the following versions of lerobot are available:
-          lerobot<0.3.0
-          lerobot==0.3.2
-          lerobot==0.3.3
-          lerobot==0.4.0
-          lerobot==0.4.1
-          lerobot==0.4.2
-          lerobot==0.4.3
-          lerobot==0.4.4
-          lerobot==0.5.0
-          lerobot==0.5.1
-      and lerobot>=0.3.2,<=0.3.3 depends on rerun-sdk>=0.21.0,<0.23.0,
-      we can conclude that lerobot>=0.3.0,<0.4.0 depends on
-      rerun-sdk>=0.21.0,<0.23.0.
-      And because lerobot>=0.4.0 depends on rerun-sdk>=0.24.0,<0.27.0 and
-      b06-physical-ai-data-layer[lerobot] depends on lerobot>=0.3.0, we can
-      conclude that b06-physical-ai-data-layer[lerobot] depends on one of:
-          rerun-sdk>=0.21.0,<0.23.0
-          rerun-sdk>=0.24.0,<0.27.0
-
-      And because your project depends on rerun-sdk[dataplatform]>=0.33.0
-      and your project requires b06-physical-ai-data-layer[lerobot], we can
-      conclude that your project's requirements are unsatisfiable.
-
-hint: While the active Python version is 3.13, the resolution failed for other Python versions supported by your project. Consider limiting your project's supported Python versions using `requires-python`.
-```
-
-- 因 `uv sync --extra dev --extra lerobot` 未完成，以下 Stage 4.1 基线项未运行：`uv run python --version`、LeRobot/Rerun/datasets/huggingface_hub 版本探测、`LeRobotDataset` import path 探测、Hugging Face dataset metadata 探测、`uv run python -m pytest -q`、真实解析 cache 路径统计。
+- 解决方式：在 `pyproject.toml` 新增 `tool.uv.override-dependencies = ["rerun-sdk[dataplatform]>=0.33.0"]`，让 LeRobot dataset loader 与项目 Rerun 0.33 baseline 在独立 `uv` 环境中共存。
+  - 该 override 不降低项目 Rerun baseline。
+  - 该 override 不把 LeRobot 变成默认依赖；LeRobot 仍只在 `lerobot` extra 中安装。
+  - 未收窄 `requires-python`。
+- 环境建立：
+  - `uv lock`：通过，`Resolved 124 packages in 479ms`，生成 `uv.lock`。
+  - `uv sync --extra dev --extra lerobot`：通过，`Installed 102 packages`。
+- 运行版本：
+  - `uv run python --version`：`Python 3.13.5`
+  - `lerobot==0.4.4`
+  - `rerun-sdk==0.33.0`
+  - `datasets==4.8.5`
+  - `huggingface_hub==0.35.3`
+- `LeRobotDataset` import path 探测：
+  - 可用：`lerobot.datasets.lerobot_dataset -> <class 'lerobot.datasets.lerobot_dataset.LeRobotDataset'>`
+  - 不可用：`lerobot.common.datasets.lerobot_dataset`，`ModuleNotFoundError: No module named 'lerobot.common'`
+- 环境变量与真实解析 cache 路径：
+  - `HF_HOME=`、`HF_HUB_CACHE=`、`HF_DATASETS_CACHE=`、`LEROBOT_HOME=`、`LEROBOT_DATA_HOME=` 均为空。
+  - `huggingface_hub.HF_HOME=/Users/lloyd/.cache/huggingface`
+  - `huggingface_hub.HF_HUB_CACHE=/Users/lloyd/.cache/huggingface/hub`
+  - `datasets.HF_DATASETS_CACHE=/Users/lloyd/.cache/huggingface/datasets`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface exists=True`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface/hub exists=True`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface/datasets exists=False`
+  - `CACHE_PATH /Users/lloyd/.cache/lerobot exists=False`
+- Hugging Face dataset metadata 网络探测：
+  - `HF_DATASET_OK lerobot/pusht sha=7628202a2180972f291ba1bc6723834921e72c19 files=8`
+  - `HF_DATASET_OK lerobot/aloha_sim_transfer_cube_human sha=6a43d500f101255823a9d2b9dc244eeb01a2cd31 files=10`
+- `uv` 环境回归测试：`uv run python -m pytest -q` 返回 `92 passed in 11.90s`。
 - 默认非 LeRobot workflow 验证：
   - `python3 --version`：`Python 3.9.6`
   - `python3 -m pip --version`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pip`
   - `python3 -m pip install -e ".[dev]"`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pip`
   - `PYTHONPATH=src python3 -m pytest -q`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pytest`
-  - 判断：默认路径未因 LeRobot 依赖破坏；本机系统 Python 缺少 pip/pytest，无法在该解释器内完成默认测试验证。本轮未把默认依赖改成包含 LeRobot。
-- 磁盘状态：
-  - `du -sh .venv`：`68K .venv`
-  - `df -h .`：`/dev/disk3s5 460Gi 170Gi 252Gi 41% /System/Volumes/Data`
-- 本地生成状态：`.venv/`、下载数据、cache、`artifacts/` 和 `.rrd` 均为本地生成状态，不提交；本轮仅显式补充 `.venv/` 到 `.gitignore`。
+  - 最接近的非 LeRobot 检查：用 `/tmp/stage4_1_default_dev_venv` 临时环境只安装 `.[dev]`，并将该 venv 的 `bin` 放到 `PATH` 前面后运行 `PYTHONPATH=src /tmp/stage4_1_default_dev_venv/bin/python -m pytest -q`，返回 `92 passed in 5.39s`。
+  - 临时默认 dev 环境检查：`lerobot_installed=False`。
+  - 判断：默认安装路径不需要 LeRobot；本轮未把默认依赖改成包含 LeRobot。
+- sync 后 cache/环境占用与磁盘状态：
+  - `du -sh /Users/lloyd/.cache/huggingface`：`1.0G`
+  - `du -sh /Users/lloyd/.cache/huggingface/hub`：`1.0G`
+  - `/Users/lloyd/.cache/huggingface/datasets`：不存在。
+  - `/Users/lloyd/.cache/lerobot`：不存在。
+  - `du -sh .venv`：`1.6G`
+  - `df -h .`：`/dev/disk3s5 460Gi 171Gi 251Gi 41% /System/Volumes/Data`
+- 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
+- 下方 PushT/ALOHA 结果为 Stage 4.1 环境建立前的历史记录；本节已解除 LeRobot 可选依赖安装阻塞，但本任务不运行真实数据 import，因此真实 smoke 状态仍待后续任务更新。
 
 ## PushT Full Acceptance 结果
 

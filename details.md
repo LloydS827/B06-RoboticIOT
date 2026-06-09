@@ -76,17 +76,18 @@
 - 新增 Stage 4 运行说明：`docs/stage4/README.md`。
 - 新增 LeRobot 到 Physical AI Package 映射文档：`docs/research/06-lerobot到physical-ai-package映射.md`。
 - 新增 LeRobot 开放数据样板链路记录：`docs/research/06-lerobot开放数据样板链路记录.md`；本轮已记录 `pytest` 与 CLI help 通过，真实 PushT/ALOHA smoke 因本地未安装 LeRobot 可选依赖而阻塞，未提前声称通过。
-- Stage 4.1 进入真实 LeRobot smoke 的独立 `uv` 环境准备；`uv sync --extra dev --extra lerobot` 当前阻塞于 LeRobot 与项目 `rerun-sdk[dataplatform]>=0.33.0` 的版本约束冲突，尚未生成 `uv.lock`，未运行真实数据 import。
-- Stage 4.1 默认非 LeRobot 路径未改为依赖 LeRobot；本机 `/Library/Developer/CommandLineTools/usr/bin/python3` 缺少 `pip`/`pytest`，因此系统 Python 默认测试验证未完成，阻塞原因已记录在链路记录文档。
+- Stage 4.1 已建立真实 LeRobot smoke 的独立 `uv` 环境：新增 `tool.uv.override-dependencies`，使 LeRobot dataset loader 与项目 `rerun-sdk[dataplatform]>=0.33.0` baseline 共存；该设置不降低 Rerun baseline，也不把 LeRobot 变成默认依赖。
+- Stage 4.1 已生成 `uv.lock`，`uv sync --extra dev --extra lerobot` 通过；当前环境版本为 Python 3.13.5、`lerobot==0.4.4`、`rerun-sdk==0.33.0`，并确认 `lerobot.datasets.lerobot_dataset.LeRobotDataset` 可导入。
+- Stage 4.1 已完成 Hugging Face metadata 探测：`lerobot/pusht` 与 `lerobot/aloha_sim_transfer_cube_human` 均可访问；`uv run python -m pytest -q` 返回 `92 passed`。
+- Stage 4.1 默认非 LeRobot 路径未改为依赖 LeRobot；本机系统 Python 缺少 `pip`/`pytest`，因此补充使用 `/tmp/stage4_1_default_dev_venv` 只安装 `.[dev]` 验证，测试返回 `92 passed` 且 `lerobot_installed=False`。
 
 ## 下一步计划
 
-1. 先处理 Stage 4.1 `uv` 环境依赖冲突，明确 LeRobot 与 Rerun SDK 的兼容策略，再恢复真实 LeRobot smoke。
-2. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
-3. 由主线程运行 Stage 4 PushT full acceptance，并补齐 validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 结果。
-4. 如果 full acceptance 受网络、数据体积或时间限制影响，先运行 PushT quick smoke 并记录阻塞原因。
-5. 运行 ALOHA representative smoke，校准多相机 artifact、`image_refs_json` 和 Rerun adapter 输出。
-6. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
+1. 由主线程运行 Stage 4 PushT full acceptance，并补齐 validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 结果。
+2. 如果 full acceptance 受网络、数据体积或时间限制影响，先运行 PushT quick smoke 并记录阻塞原因。
+3. 运行 ALOHA representative smoke，校准多相机 artifact、`image_refs_json` 和 Rerun adapter 输出。
+4. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
+5. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
 
 ## 维护约定
 
