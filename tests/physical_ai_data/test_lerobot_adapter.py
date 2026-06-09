@@ -114,6 +114,43 @@ def test_import_lerobot_episode_creates_valid_physical_ai_package(tmp_path: Path
     assert state_action[0]["state_json"] == "[0.1, 0.2, 0.3, 0.4]"
 
 
+def test_import_lerobot_episode_records_additional_camera_refs(tmp_path: Path):
+    episode = _episode(tmp_path)
+    side = tmp_path / "source_images" / "side_0000.png"
+    _image(side, (0, 0, 255))
+    frames = list(episode.frames)
+    frames[0] = LeRobotFrame(
+        frame_index=0,
+        timestamp_s=0.0,
+        images={**frames[0].images, "side": side},
+        state=frames[0].state,
+        action=frames[0].action,
+    )
+    episode = LeRobotEpisode(
+        repo_id=episode.repo_id,
+        episode_index=episode.episode_index,
+        fps=episode.fps,
+        frames=frames,
+        task_name=episode.task_name,
+        profile=episode.profile,
+        root=episode.root,
+        features=episode.features,
+        stats=episode.stats,
+        episode_metadata=episode.episode_metadata,
+        task_metadata=episode.task_metadata,
+    )
+
+    package = import_lerobot_episode(episode, tmp_path / "package", primary_camera="front")
+    row = _rows(package / "frames.csv")[0]
+    image_refs = json.loads(row["image_refs_json"])
+
+    assert row["image_ref"] == "artifacts/images/front/frame_0000.png"
+    assert image_refs == {
+        "front": "artifacts/images/front/frame_0000.png",
+        "side": "artifacts/images/side/frame_0000.png",
+    }
+
+
 def test_import_lerobot_episode_adds_fallback_profile_warning(tmp_path: Path):
     episode = _episode(tmp_path)
     fallback_episode = LeRobotEpisode(

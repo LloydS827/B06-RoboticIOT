@@ -12,7 +12,7 @@ from physical_ai_data.validation import MANIFEST_FILENAME, validate_package
 
 
 def write_rrd(package_root: str | Path, output_rrd: str | Path) -> Path:
-    """Write a Rerun `.rrd` recording for a validated CavLAB package."""
+    """Write a Rerun `.rrd` recording for a validated Physical AI Package."""
     root = Path(package_root)
     output = Path(output_rrd)
     validation = validate_package(root)
@@ -122,6 +122,17 @@ def _log_frames(rr: Any, root: Path, frames: list[dict[str, str]], base_path: st
         image_ref = frame.get("image_ref", "")
         if image_ref:
             _log(rr, f"{frame_path}/image", rr.Image(_read_image(root / image_ref)))
+        additional_image_refs = _additional_image_refs(root, frame.get("image_refs_json", ""), image_ref)
+        for camera_name, camera_image_path in additional_image_refs.items():
+            try:
+                image = _read_image(camera_image_path)
+            except Exception:
+                continue
+            _log(
+                rr,
+                f"{frame_path}/images/{_safe_entity_name(camera_name)}",
+                rr.Image(image),
+            )
 
         point_cloud_ref = frame.get("point_cloud_ref", "")
         if point_cloud_ref and point_cloud_ref not in seen_point_cloud_refs:
@@ -136,6 +147,40 @@ def _log_frames(rr: Any, root: Path, frames: list[dict[str, str]], base_path: st
             if points:
                 _log(rr, f"{frame_path}/trajectory", rr.LineStrips3D([points]))
                 seen_trajectory_refs.add(trajectory_ref)
+
+
+def _additional_image_refs(root: Path, image_refs_json: str, primary_image_ref: str) -> dict[str, Path]:
+    if not image_refs_json:
+        return {}
+    try:
+        payload = json.loads(image_refs_json)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    if not isinstance(payload, Mapping):
+        return {}
+    image_refs: dict[str, Path] = {}
+    for camera_name, image_ref in payload.items():
+        if not isinstance(image_ref, str) or not image_ref or image_ref == primary_image_ref:
+            continue
+        image_path = _optional_package_file(root, image_ref)
+        if image_path is None:
+            continue
+        image_refs[str(camera_name)] = image_path
+    return image_refs
+
+
+def _optional_package_file(root: Path, relative_ref: str) -> Path | None:
+    relative_path = Path(relative_ref)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        return None
+    path = root / relative_path
+    if not path.is_file():
+        return None
+    try:
+        path.resolve().relative_to(root.resolve())
+    except ValueError:
+        return None
+    return path
 
 
 def _log_metrics(rr: Any, metrics: list[dict[str, str]], base_path: str) -> None:
