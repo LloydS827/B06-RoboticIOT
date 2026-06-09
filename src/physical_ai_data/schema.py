@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 SCHEMA_VERSION = "physical-ai-package/v0.1"
 
-SUPPORTED_SCENARIOS = {"robot_welding_station", "arm_pick_sort"}
+SUPPORTED_SCENARIOS = {"robot_welding_station", "arm_pick_sort", "open_robot_manipulation"}
 
 REQUIRED_MANIFEST_FIELDS = [
     "schema_version",
