@@ -56,21 +56,34 @@
 - 阶段 3 设计文档已完成三轮 spec review，并根据评审意见补充 `rerun` 可选性、坐标系结构、引用约定、候选帧归属、`sim_time` 默认规则和候选 CSV 最小列。
 - 新增阶段 3 实施计划：`docs/superpowers/plans/2026-06-08-simulation-first-physical-ai-data-package.md`。
 - 阶段 3 实施计划已完成三轮 plan review，修正 validator warning、`_ref` 校验范围、events/metrics 时间戳校验和 smoke/final verification 环境可复现性问题。
-- 完成阶段 3 implementation 初稿：新增 `physical_ai_data` Python package，形成 CavLAB Physical AI 数据包 v0.1 的 schema/validator、package IO、候选导出、Rerun adapter 和 CLI prototype。
+- 完成阶段 3 implementation 初稿：新增 `physical_ai_data` Python package，形成 Physical AI Package v0.1 的 schema/validator、package IO、候选导出、Rerun adapter 和 CLI prototype。
 - 完成两个仿真样例生成能力：机器人焊接工站 `robot_welding_station` 和机械臂抓取/分拣 `arm_pick_sort`。
 - 完成 candidate export，默认输出 `PACKAGE/derived/candidates.csv`，用于人工复核、训练样本筛选和评测样本整理。
-- 完成 Rerun adapter，将通过 validator 的 CavLAB package 转换为 `.rrd`；Rerun 在阶段 3 中定位为 adapter backend，不是业务 schema。
+- 完成 Rerun adapter，将通过 validator 的 Physical AI Package 转换为 `.rrd`；Rerun 在阶段 3 中定位为 adapter backend，不是业务 schema。
 - 完成 Stage 3 CLI：`generate`、`validate`、`summarize`、`export-candidates`、`convert-rerun`。
 - 测试和复核进展：已形成 `tests/physical_ai_data/` 单元测试覆盖，并完成最终 smoke；Viewer/Blueprint 人工检查和性能冒烟仍需补充。
 - 阶段 3 最终 smoke 结果：`PYTHONPATH=src python3 -m pytest -q` 返回 `68 passed`；两个 24 帧样例包均生成、校验、汇总、导出候选 CSV、转换 `.rrd` 成功，两个 `.rrd` 均通过 `rerun rrd verify`。
 - 新增阶段 3 运行说明：`docs/stage3/README.md`。
 - 新增阶段 3 实施记录：`docs/research/05-physical-ai数据包阶段三实施记录.md`。
 
+### 2026-06-09
+
+- 确认 Stage 4 进入 LeRobot Open Dataset Workflow，不接机器人硬件、不训练模型，先用开源机器人操作数据验证 Physical AI Package 对真实社区数据的承接能力。
+- Stage 4 已形成 LeRobot normalized episode/frame 表示、import adapter、lazy loader 和 `import-lerobot` CLI，LeRobot 依赖保持为可选安装，不破坏默认开发安装路径。
+- Stage 4 已形成 `pusht`、`aloha`、`fallback` profile：PushT 用于 full acceptance，ALOHA 用于代表性多相机 smoke，fallback 用于未知 repo 的保守映射。
+- Stage 4 已支持把 LeRobot feature schema、stats、episode metadata、task metadata、state/action artifact 写入 Physical AI Package，并生成 `action_norm`、`state_norm`、`action_delta`、`image_available` 等候选筛选线索。
+- Stage 4 已形成 Rerun 多相机引用支持：`frames.csv` 保留主 `image_ref`，扩展列 `image_refs_json` 记录同一 frame 的全部相机 artifact。
+- 新增 Stage 4 运行说明：`docs/stage4/README.md`。
+- 新增 LeRobot 到 Physical AI Package 映射文档：`docs/research/06-lerobot到physical-ai-package映射.md`。
+- 新增 LeRobot 开放数据样板链路记录：`docs/research/06-lerobot开放数据样板链路记录.md`；本轮已记录 `pytest` 与 CLI help 通过，真实 PushT/ALOHA smoke 因本地未安装 LeRobot 可选依赖而阻塞，未提前声称通过。
+
 ## 下一步计划
 
 1. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
-2. 补充性能冒烟，覆盖更长帧数、更大 artifact、`.rrd` 文件体积和基本打开体验。
-3. 进入阶段 4：收敛 CavLAB 自有规范、SDK wrapper、external importer 边界、数据包目录结构和 Rerun 后端替换边界。
+2. 由主线程运行 Stage 4 PushT full acceptance，并补齐 validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 结果。
+3. 如果 full acceptance 受网络、数据体积或时间限制影响，先运行 PushT quick smoke 并记录阻塞原因。
+4. 运行 ALOHA representative smoke，校准多相机 artifact、`image_refs_json` 和 Rerun adapter 输出。
+5. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
 
 ## 维护约定
 
