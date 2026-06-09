@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Manage CavLAB Physical AI data packages.")
+    parser = argparse.ArgumentParser(description="Manage Physical AI Package data packages.")
     subcommands = parser.add_subparsers(dest="command", required=True)
 
     generate = subcommands.add_parser("generate", help="Generate a deterministic sample package.")
@@ -54,6 +54,21 @@ def _build_parser() -> argparse.ArgumentParser:
     convert.add_argument("package", type=Path, help="Package directory to convert.")
     convert.add_argument("--output-rrd", type=Path, required=True, help="Output .rrd path.")
     convert.set_defaults(func=_convert_rerun)
+
+    import_lerobot = subcommands.add_parser("import-lerobot", help="Import a LeRobot episode into a Physical AI Package.")
+    import_lerobot.add_argument("--repo-id", required=True, help="LeRobot repository ID.")
+    import_lerobot.add_argument("--episode-index", type=int, required=True, help="Episode index to import.")
+    import_lerobot.add_argument("--output-dir", type=Path, required=True, help="Output package directory.")
+    import_lerobot.add_argument("--root", type=Path, help="Local LeRobot dataset root.")
+    import_lerobot.add_argument(
+        "--profile",
+        default="auto",
+        choices=["auto", "pusht", "aloha", "fallback"],
+        help="Dataset mapping profile.",
+    )
+    import_lerobot.add_argument("--max-frames", type=int, help="Maximum frames to import.")
+    import_lerobot.add_argument("--camera", help="Primary camera to import.")
+    import_lerobot.set_defaults(func=_import_lerobot)
 
     return parser
 
@@ -121,6 +136,31 @@ def _export_candidates(args: argparse.Namespace) -> int:
 def _convert_rerun(args: argparse.Namespace) -> int:
     output = write_rrd(args.package, args.output_rrd)
     print(f"Wrote Rerun recording: {output}")
+    return 0
+
+
+def _import_lerobot(args: argparse.Namespace) -> int:
+    from physical_ai_data.lerobot_adapter import import_lerobot_episode
+    from physical_ai_data.lerobot_loader import load_lerobot_episode
+
+    if args.max_frames is not None and args.max_frames <= 0:
+        raise ValueError("max_frames must be positive")
+
+    episode = load_lerobot_episode(
+        repo_id=args.repo_id,
+        episode_index=args.episode_index,
+        root=args.root,
+        profile=args.profile,
+        max_frames=args.max_frames,
+        camera=args.camera,
+    )
+    package = import_lerobot_episode(
+        episode,
+        args.output_dir,
+        max_frames=args.max_frames,
+        primary_camera=args.camera,
+    )
+    print(f"Imported LeRobot episode to Physical AI Package: {package}")
     return 0
 
 

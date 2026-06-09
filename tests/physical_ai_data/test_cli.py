@@ -93,7 +93,7 @@ def test_cli_wrapper_runs_without_pythonpath(tmp_path: Path):
 
     help_result = _run(["--help"], env=env)
     assert help_result.returncode == 0, help_result.stderr
-    assert "Physical AI data packages" in help_result.stdout
+    assert "Physical AI Package" in help_result.stdout
 
     validate = _run(["validate", str(tmp_path)], env=env)
     assert validate.returncode == 1
