@@ -22,8 +22,8 @@ Stage 4.1 的最低成功标准如下：
 
 1. 建立项目独立 `uv` 环境，并确认 `.[dev,lerobot]` 可安装或记录明确阻塞原因。
 2. 记录真实环境信息：Python 版本、`uv` 版本、LeRobot 版本、Rerun 版本、关键 import path、缓存目录、网络和磁盘限制。
-3. PushT quick smoke 必须通过，除非遇到外部不可控阻塞，并且阻塞原因必须可复现、可定位、可记录。
-4. ALOHA representative smoke 必须通过，除非遇到外部不可控阻塞，并且阻塞原因必须可复现、可定位、可记录。
+3. PushT quick smoke 必须实际通过完整链路；如果遇到外部不可控阻塞，本阶段不能标记完成，只能形成阻塞记录。
+4. ALOHA representative smoke 必须实际通过完整链路；如果遇到外部不可控阻塞，本阶段不能标记完成，只能形成阻塞记录。
 5. 对通过导入的数据包执行共享检查命令：
    - `validate`
    - `summarize`
@@ -35,6 +35,8 @@ Stage 4.1 的最低成功标准如下：
 8. 更新 Stage 4 链路记录、LeRobot mapping 文档和 `details.md`，明确真实 smoke 结果、限制和后续建议。
 
 PushT full acceptance 作为尝试项：如果网络、磁盘、下载体积和时间条件允许，则运行并记录完整结果；如果不允许，则记录原因，不阻塞 Stage 4.1 的最低完成标准。
+
+外部不可控阻塞包括 Hugging Face 网络不可用、上游数据集不可访问、磁盘空间不足、平台暂不支持的二进制依赖等。此类问题需要记录命令、错误摘要、环境信息和下一步建议，但不能替代 PushT quick smoke 与 ALOHA representative smoke 的通过证据。
 
 ## 4. 非目标
 
@@ -205,6 +207,8 @@ Stage 4.1 完成后需要更新：
 | 视频或图像解码依赖缺失 | 记录缺失依赖；如属于 LeRobot 可选依赖，应纳入 uv 环境修正。 |
 | Rerun Viewer GUI 不可用 | 保留 `.rrd verify` 结果，并记录人工检查未完成原因。 |
 | 真实字段无法保守映射 | 生成明确 warning，不编造成功/失败、标定、双臂语义或任务质量。 |
+
+如果 PushT quick smoke 或 ALOHA representative smoke 因上述风险未实际通过，Stage 4.1 应记录为阻塞或未完成，而不是有条件完成。只有 PushT full acceptance 可以因为资源限制保留为尝试项。
 
 ## 12. 完成定义
 
