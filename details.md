@@ -78,12 +78,13 @@
 - 新增 LeRobot 开放数据样板链路记录：`docs/research/06-lerobot开放数据样板链路记录.md`；历史记录保留了环境建立前的依赖阻塞，Stage 4.1 已更新为真实 PushT quick smoke 和 ALOHA representative smoke 通过。
 - Stage 4.1 已建立真实 LeRobot smoke 的独立 `uv` 环境：新增 `tool.uv.override-dependencies`，使 LeRobot dataset loader 与项目 `rerun-sdk[dataplatform]>=0.33.0` baseline 共存；该设置不降低 Rerun baseline，也不把 LeRobot 变成默认依赖。
 - Stage 4.1 已生成 `uv.lock`，`uv sync --extra dev --extra lerobot` 通过；当前环境版本为 Python 3.13.5、`lerobot==0.4.4`、`rerun-sdk==0.33.0`，并确认 `lerobot.datasets.lerobot_dataset.LeRobotDataset` 可导入。
-- Stage 4.1 已完成 Hugging Face metadata 探测：`lerobot/pusht` 与 `lerobot/aloha_sim_transfer_cube_human` 均可访问；`uv run python -m pytest -q` 返回 `92 passed`。
-- Stage 4.1 默认非 LeRobot 路径未改为依赖 LeRobot；本机系统 Python 缺少 `pip`/`pytest`，因此补充使用 `/tmp/stage4_1_default_dev_venv` 只安装 `.[dev]` 验证，测试返回 `92 passed` 且 `lerobot_installed=False`。
+- Stage 4.1 已完成 Hugging Face metadata 探测：`lerobot/pusht` 与 `lerobot/aloha_sim_transfer_cube_human` 均可访问；环境建立阶段 `uv run python -m pytest -q` 返回 `92 passed`。
+- Stage 4.1 默认非 LeRobot 路径未改为依赖 LeRobot；本机系统 Python 缺少 `pip`/`pytest`，因此补充使用临时 `.[dev]` 环境验证。最终回归中 `lerobot_installed=False`，并在前置该 venv `bin` 到 `PATH` 后返回 `99 passed`。
 - Stage 4.1 已针对 LeRobot 0.4.4 的真实旧格式数据补 loader fallback：`lerobot/pusht` 可通过 Hugging Face streaming 读取 parquet 行，`lerobot/aloha_static_towel` 可按 metadata video keys 解码 4 路相机图像。
 - Stage 4.1 已跑通真实 `lerobot/pusht` quick smoke：120 frames import、validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 均通过。
 - Stage 4.1 已跑通真实 `lerobot/aloha_static_towel` representative smoke：60 frames、`cam_high`/`cam_left_wrist`/`cam_low`/`cam_right_wrist` 四路相机、`image_refs_json`、candidate export、Rerun `.rrd verify` 均通过。
 - Stage 4.1 已完成 `lerobot/pusht` full acceptance 尝试：不加 `--max-frames` 导入 161 frames，validate/summarize/export-candidates/convert-rerun 和 full/quick/ALOHA representative `.rrd verify` 均通过；native Rerun GUI 在当前自动化环境触发 wgpu surface 尺寸错误，Viewer/Blueprint 人工视觉验收未完成，仅保留 headless Viewer 截图和 `.rrd verify` 证据。
+- Stage 4.1 最终回归完成：`uv run python -m pytest -q` 返回 `99 passed`，最终整体 review 为 No findings；本地生成的 `.venv/`、`artifacts/`、cache、`.rrd` 均未纳入 git 跟踪。
 
 ## 下一步计划
 
