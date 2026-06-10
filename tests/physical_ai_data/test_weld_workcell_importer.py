@@ -23,7 +23,7 @@ def _rows(path: Path) -> list[dict[str, str]]:
         return list(csv.DictReader(file))
 
 
-def _write_weld_source(root: Path) -> Path:
+def _write_weld_source(root: Path, *, include_review_labels: bool = True) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     (root / "images").mkdir()
     tiny_png = base64.b64decode(
@@ -135,20 +135,21 @@ def _write_weld_source(root: Path) -> Path:
             }
         ],
     )
-    _write_csv(
-        root / "review_labels.csv",
-        ["timestamp_s", "label_type", "value", "confidence", "review_status", "reviewer"],
-        [
-            {
-                "timestamp_s": "0.19",
-                "label_type": "bead_quality",
-                "value": "acceptable",
-                "confidence": "0.9",
-                "review_status": "reviewed",
-                "reviewer": "qa_01",
-            }
-        ],
-    )
+    if include_review_labels:
+        _write_csv(
+            root / "review_labels.csv",
+            ["timestamp_s", "label_type", "value", "confidence", "review_status", "reviewer"],
+            [
+                {
+                    "timestamp_s": "0.19",
+                    "label_type": "bead_quality",
+                    "value": "acceptable",
+                    "confidence": "0.9",
+                    "review_status": "reviewed",
+                    "reviewer": "qa_01",
+                }
+            ],
+        )
     return root
 
 
@@ -181,8 +182,38 @@ def test_weld_workcell_importer_creates_valid_robot_welding_package(tmp_path: Pa
     assert (package / "artifacts/images/frame_0000.png").is_file()
     trajectory_rows = _rows(package / "artifacts/trajectories/tcp_path.csv")
     assert list(trajectory_rows[0]) == ["frame_id", "timestamp_s", "x", "y", "z", "qx", "qy", "qz", "qw"]
+    assert trajectory_rows[0] == {
+        "frame_id": "frame_0000",
+        "timestamp_s": "0.0",
+        "x": "0.10",
+        "y": "0.20",
+        "z": "0.30",
+        "qx": "0.0",
+        "qy": "0.0",
+        "qz": "0.0",
+        "qw": "1.0",
+    }
     assert (package / "artifacts/source/job.json").is_file()
     assert (package / "artifacts/source/frames.csv").is_file()
     assert (package / "artifacts/source/process.csv").is_file()
     assert (package / "artifacts/source/events.csv").is_file()
     assert (package / "artifacts/source/review_labels.csv").is_file()
+
+
+def test_weld_workcell_importer_omits_absent_review_labels_ref(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source", include_review_labels=False)
+    request = ImportRequest(
+        source_format="weld_workcell",
+        source={"root": source},
+        output_dir=tmp_path / "package",
+        options={"copy_images": True},
+    )
+
+    run_import(WeldWorkcellPackageImporter(), request)
+
+    package = tmp_path / "package"
+    validation = validate_package(package)
+    assert validation.ok, validation.errors
+    manifest = json.loads((package / "physical_ai_manifest.json").read_text(encoding="utf-8"))
+    assert "review_labels_csv_ref" not in manifest["source_dataset"]
+    assert not (package / "artifacts/source/review_labels.csv").exists()

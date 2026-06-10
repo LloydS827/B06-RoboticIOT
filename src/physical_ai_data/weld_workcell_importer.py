@@ -88,12 +88,13 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
     source_frames = read_csv_rows(source_root / "frames.csv")
     source_process = read_csv_rows(source_root / "process.csv")
     source_events = read_csv_rows(source_root / "events.csv")
-    source_labels = read_csv_rows(source_root / "review_labels.csv") if (source_root / "review_labels.csv").exists() else []
+    has_review_labels = (source_root / "review_labels.csv").exists()
+    source_labels = read_csv_rows(source_root / "review_labels.csv") if has_review_labels else []
 
     _validate_columns(source_frames, source_root / "frames.csv", FRAME_REQUIRED_COLUMNS)
     _validate_columns(source_process, source_root / "process.csv", PROCESS_REQUIRED_COLUMNS)
     _validate_columns(source_events, source_root / "events.csv", EVENT_REQUIRED_COLUMNS)
-    if (source_root / "review_labels.csv").exists():
+    if has_review_labels:
         _validate_columns(source_labels, source_root / "review_labels.csv", LABEL_REQUIRED_COLUMNS)
     _validate_rows(source_frames, "frames.csv")
     _validate_rows(source_process, "process.csv")
@@ -133,19 +134,18 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
                 "trajectory_ref": "artifacts/trajectories/tcp_path.csv",
             }
         )
-        trajectory_rows.append(
-            {
-                "frame_id": frame_id,
-                "timestamp_s": timestamp_s,
-                "x": _finite_float(frame["tcp_x"], "tcp_x"),
-                "y": _finite_float(frame["tcp_y"], "tcp_y"),
-                "z": _finite_float(frame["tcp_z"], "tcp_z"),
-                "qx": _finite_float(frame["tcp_qx"], "tcp_qx"),
-                "qy": _finite_float(frame["tcp_qy"], "tcp_qy"),
-                "qz": _finite_float(frame["tcp_qz"], "tcp_qz"),
-                "qw": _finite_float(frame["tcp_qw"], "tcp_qw"),
-            }
-        )
+        tcp_values = {
+            "x": frame["tcp_x"].strip(),
+            "y": frame["tcp_y"].strip(),
+            "z": frame["tcp_z"].strip(),
+            "qx": frame["tcp_qx"].strip(),
+            "qy": frame["tcp_qy"].strip(),
+            "qz": frame["tcp_qz"].strip(),
+            "qw": frame["tcp_qw"].strip(),
+        }
+        for field, value in tcp_values.items():
+            _finite_float(value, field)
+        trajectory_rows.append({"frame_id": frame_id, "timestamp_s": timestamp_s, **tcp_values})
 
     metric_rows = _metric_rows(source_process)
     event_rows = _event_rows(source_events, frame_rows, job)
@@ -163,6 +163,7 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
             label_count=len(label_rows),
             converted_at=converted_at,
             copy_images=copy_images,
+            has_review_labels=has_review_labels,
         ),
     )
     write_csv_rows(package_root / "frames.csv", REQUIRED_TABLE_COLUMNS["frames"], frame_rows)
@@ -311,9 +312,28 @@ def _manifest(
     label_count: int,
     converted_at: str,
     copy_images: bool,
+    has_review_labels: bool,
 ) -> dict[str, object]:
     work_order_id = str(job["work_order_id"])
     station_id = str(job["station_id"])
+    source_dataset: dict[str, object] = {
+        "format": "weld_workcell",
+        "root": str(source_root),
+        "job_json_ref": "artifacts/source/job.json",
+        "frames_csv_ref": "artifacts/source/frames.csv",
+        "process_csv_ref": "artifacts/source/process.csv",
+        "events_csv_ref": "artifacts/source/events.csv",
+        "frame_count": frame_count,
+        "process_row_count": process_count,
+        "event_count": event_count,
+        "label_count": label_count,
+        "image_copy_policy": "copied_to_artifacts_images_frame_id"
+        if copy_images
+        else "image_refs_empty_when_copy_images_false",
+        "converted_at": converted_at,
+    }
+    if has_review_labels:
+        source_dataset["review_labels_csv_ref"] = "artifacts/source/review_labels.csv"
     return {
         "schema_version": SCHEMA_VERSION,
         "package_id": f"weld_workcell_{work_order_id}_{station_id}",
@@ -349,23 +369,7 @@ def _manifest(
             "trajectories": "artifacts/trajectories",
             "source": "artifacts/source",
         },
-        "source_dataset": {
-            "format": "weld_workcell",
-            "root": str(source_root),
-            "job_json_ref": "artifacts/source/job.json",
-            "frames_csv_ref": "artifacts/source/frames.csv",
-            "process_csv_ref": "artifacts/source/process.csv",
-            "events_csv_ref": "artifacts/source/events.csv",
-            "review_labels_csv_ref": "artifacts/source/review_labels.csv",
-            "frame_count": frame_count,
-            "process_row_count": process_count,
-            "event_count": event_count,
-            "label_count": label_count,
-            "image_copy_policy": "copied_to_artifacts_images_frame_id"
-            if copy_images
-            else "image_refs_empty_when_copy_images_false",
-            "converted_at": converted_at,
-        },
+        "source_dataset": source_dataset,
     }
 
 
