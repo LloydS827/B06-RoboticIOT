@@ -83,6 +83,9 @@ class WeldWorkcellPackageImporter:
 
 def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) -> Path:
     _validate_source_files(source_root)
+    package_root = Path(output_dir)
+    if package_root.resolve() == source_root.resolve():
+        raise ValueError("output_dir must not be the same as source.root")
 
     job = read_json(source_root / "job.json")
     _validate_job(job)
@@ -152,7 +155,6 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
     label_rows = _label_rows(source_labels, frame_rows)
     converted_at = _utc_now()
 
-    package_root = Path(output_dir)
     _prepare_package(package_root)
     _copy_source_files(source_root, package_root)
     for frame_id, image_path in image_copies:
@@ -229,12 +231,12 @@ def _label_rows(source_labels: list[dict[str, str]], frames: list[dict[str, obje
     rows: list[dict[str, object]] = []
     for label in source_labels:
         label_type = label.get("label_type", "").strip()
-        if not label_type:
-            continue
         timestamp_s = label["timestamp_s"].strip()
         timestamp = _finite_float(timestamp_s, "review_labels.csv timestamp_s")
         confidence = label.get("confidence", "").strip()
         _finite_float(confidence, "review_labels.csv confidence")
+        if not label_type:
+            continue
         rows.append(
             {
                 "label_id": f"label_{len(rows):04d}",

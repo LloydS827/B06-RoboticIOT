@@ -125,8 +125,8 @@
 - Stage 4.4 将 importer contract 从 LeRobot/fixture 推进到第一个贴近业务的多文件导出 candidate，但不新增 CLI、registry、plugin lifecycle，也不接真实机器人、PLC、OPC UA、MES、HMI 或数据库。
 - Stage 4.4 输出 package 已验证可继续进入 validate、summarize、export-candidates、training/evaluation draft export 和非 GUI Rerun `.rrd` adapter。
 - Stage 4.4 本轮最终验证结果：
-  - `python -m pytest tests/physical_ai_data/test_weld_workcell_importer.py tests/physical_ai_data/test_rerun_adapter.py tests/physical_ai_data/test_training_export.py -q`：`49 passed in 0.93s`。
-  - `python -m pytest -q`：`171 passed in 2.63s`。
+  - `python -m pytest tests/physical_ai_data/test_weld_workcell_importer.py tests/physical_ai_data/test_rerun_adapter.py tests/physical_ai_data/test_training_export.py -q`：`51 passed in 0.78s`。
+  - `python -m pytest -q`：`173 passed in 2.69s`。
 
 ## 下一步计划
 

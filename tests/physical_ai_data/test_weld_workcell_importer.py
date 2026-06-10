@@ -359,6 +359,16 @@ def test_weld_workcell_importer_requires_process_csv(tmp_path: Path):
         _import_weld_source(source, tmp_path / "package")
 
 
+def test_weld_workcell_importer_rejects_in_place_output_dir(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+
+    with pytest.raises(ValueError, match="output_dir must not be the same as source.root"):
+        _import_weld_source(source, source)
+
+    assert (source / "frames.csv").is_file()
+    assert not (source / "artifacts").exists()
+
+
 def test_weld_workcell_importer_requires_robot_id(tmp_path: Path):
     source = _write_weld_source(tmp_path / "source")
     job = json.loads((source / "job.json").read_text(encoding="utf-8"))
@@ -415,6 +425,15 @@ def test_weld_workcell_importer_rejects_nonfinite_process_numeric(tmp_path: Path
 
 def test_weld_workcell_importer_rejects_nonfinite_review_label_confidence(tmp_path: Path):
     source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "review_labels.csv", 0, "confidence", "inf")
+
+    with pytest.raises(ValueError, match="confidence must be a finite number"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_validates_skipped_review_label_rows(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "review_labels.csv", 0, "label_type", "")
     _rewrite_csv_value(source / "review_labels.csv", 0, "confidence", "inf")
 
     with pytest.raises(ValueError, match="confidence must be a finite number"):
