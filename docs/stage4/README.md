@@ -125,7 +125,7 @@ print(result.package_root, result.frame_count)
 
 ## Training Draft Export
 
-Stage 4.2 新增 training/evaluation draft export，用于从已校验 package 和 candidates 生成最小草案产物。它不是正式训练格式，只是后续 Stage 4.3 收紧 contract 的起点。
+Stage 4.3 已将 training/evaluation draft export 收紧为 `physical-ai-training-eval-draft/v0.2`。它仍不是正式训练框架格式，而是 Physical AI Package 的 draft sample index，用于把候选帧整理成后续标注、评估和正式训练导出的输入边界。
 
 ```bash
 uv run python scripts/physical_ai_package.py export-training-draft \
@@ -141,10 +141,67 @@ artifacts/stage4/pusht_episode_0000/derived/training_eval/
   samples.csv
 ```
 
+`training_eval_manifest.json` 的关键边界：
+
+- `export_format`: `physical-ai-training-eval-draft/v0.2`
+- `contract_status`: `draft`
+- `formal_format`: `false`
+- `allowed_splits`: `unspecified`、`train`、`eval`、`validation`、`test`、`holdout`
+- `samples_schema_version`: `physical-ai-training-eval-samples/v0.2`
+
+`samples.csv` 字段：
+
+```text
+sample_id,split,package_id,frame_id,timestamp_s,candidate_id,
+candidate_source_type,candidate_source_id,object_id,score,reasons,
+label_status,label_ref,primary_artifact_ref,package_root
+```
+
+`split` 可省略，默认写入 `unspecified`；如果显式传入，只接受上述允许值。本阶段不做自动 train/eval split，也不推断成功/失败或质量标签。
+
+## CSV Recording Importer Fixture
+
+Stage 4.3 新增 `CsvRecordingPackageImporter` 作为离线 fixture，用来验证 external importer contract 不是 LeRobot 专用接口。它读取本地单文件 `frames.csv` 和可选相对图片，输出标准 Physical AI Package。该 importer 不暴露 CLI，不是生产业务 connector。
+
+输入目录最小形态：
+
+```text
+source_root/
+  frames.csv
+  images/
+```
+
+`frames.csv` 最小列：
+
+```text
+timestamp_s,phase,image_path,metric_name,metric_value
+```
+
+Python 调用示例：
+
+```python
+from pathlib import Path
+
+from physical_ai_data.csv_recording_importer import CsvRecordingPackageImporter
+from physical_ai_data.importers import ImportRequest, run_import
+
+request = ImportRequest(
+    source_format="csv_recording",
+    source={"root": Path("fixtures/csv_recording")},
+    output_dir=Path("artifacts/stage4/csv_recording_package"),
+)
+
+result = run_import(CsvRecordingPackageImporter(), request)
+print(result.package_root, result.frame_count)
+```
+
+输出 package 的 `source_dataset.format` 为 `csv_recording`，并记录源目录、源 `frames.csv` 引用、frame count 和转换时间。图片路径必须相对 `source.root`，不能是绝对路径或包含路径回退。
+
 ## 已知限制
 
 - 本阶段不连接机器人硬件。
 - 本阶段不训练模型，也不判断策略效果。
 - 真实 LeRobot smoke 依赖网络、Hugging Face 数据集可用性、本地缓存和 LeRobot 版本。
 - ALOHA smoke 是兼容性 smoke，不是完整语义映射；未在源数据中明确给出的机器人标定、相机外参、成功/失败标签和任务质量不会被推断。
+- CSV Recording importer 是 contract fixture，不是正式业务系统 connector。
 - Rerun 仍作为 adapter backend 使用，Physical AI Package 是当前主数据包结构。
