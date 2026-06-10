@@ -407,21 +407,24 @@ class LeRobotPackageImporter:
     source_format = "lerobot"
 
     def import_package(self, request: ImportRequest) -> ImportResult:
+        if request.source_format != self.source_format:
+            raise ValueError(f"LeRobot importer cannot handle {request.source_format}")
+
         from physical_ai_data.lerobot_loader import load_lerobot_episode
 
         repo_id = _required_str(request.source, "repo_id", "source")
         episode_index = _required_int(request.source, "episode_index", "source")
         root = request.source.get("root")
         if root is not None and not isinstance(root, (str, Path)):
-            raise ValueError("source.root must be a path string")
+            raise ValueError("source.root must be a path string or Path")
 
         profile = _optional_str(request.options, "profile", "options") or "auto"
         max_frames = _optional_int(request.options, "max_frames", "options")
         camera = _optional_str(request.options, "camera", "options")
 
         episode = load_lerobot_episode(
-            repo_id,
-            episode_index,
+            repo_id=repo_id,
+            episode_index=episode_index,
             root=root,
             profile=profile,
             max_frames=max_frames,
@@ -445,7 +448,7 @@ class LeRobotPackageImporter:
                 source_format=self.source_format,
                 source_id=f"{repo_id}#episode={episode_index}",
                 frame_count=frame_count,
-                warnings=[warning.code for warning in validation.warnings],
+                warnings=[f"{warning.code}: {warning.message}" for warning in validation.warnings],
             )
         finally:
             episode.close()

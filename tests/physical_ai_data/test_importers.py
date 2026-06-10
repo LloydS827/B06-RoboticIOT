@@ -91,6 +91,7 @@ def test_lerobot_package_importer_maps_request_to_loader_and_returns_result(
     calls: list[Mapping[str, object]] = []
 
     def fake_loader(
+        *,
         repo_id: str,
         episode_index: int,
         root: str | Path | None = None,
@@ -122,7 +123,7 @@ def test_lerobot_package_importer_maps_request_to_loader_and_returns_result(
         options={"profile": "pusht", "max_frames": 1, "camera": "front"},
     )
 
-    result = LeRobotPackageImporter().import_package(request)
+    result = run_import(LeRobotPackageImporter(), request)
 
     assert calls == [
         {
@@ -171,11 +172,42 @@ def test_lerobot_package_importer_closes_loaded_episode(tmp_path: Path, monkeypa
     assert closed == [True]
 
 
+def test_lerobot_package_importer_rejects_direct_source_format_mismatch_before_loading(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import physical_ai_data.lerobot_loader as lerobot_loader
+
+    def fake_loader(
+        repo_id: str,
+        episode_index: int,
+        root: str | Path | None = None,
+        profile: str = "auto",
+        max_frames: int | None = None,
+        camera: str | None = None,
+    ) -> LeRobotEpisode:
+        raise AssertionError("loader should not be called")
+
+    monkeypatch.setattr(lerobot_loader, "load_lerobot_episode", fake_loader)
+    request = ImportRequest(
+        source_format="other",
+        source={"repo_id": "lerobot/pusht", "episode_index": 7},
+        output_dir=tmp_path / "package",
+    )
+
+    with pytest.raises(ValueError, match="LeRobot importer cannot handle other"):
+        LeRobotPackageImporter().import_package(request)
+
+
 @pytest.mark.parametrize(
     ("source", "message"),
     [
         ({"episode_index": 7}, "source.repo_id must be a string"),
         ({"repo_id": "lerobot/pusht", "episode_index": "7"}, "source.episode_index must be an integer"),
+        (
+            {"repo_id": "lerobot/pusht", "episode_index": 7, "root": object()},
+            "source.root must be a path string or Path",
+        ),
     ],
 )
 def test_lerobot_package_importer_rejects_invalid_required_source_fields(
@@ -222,3 +254,45 @@ def test_lerobot_package_importer_reports_validation_error_codes(
 
     with pytest.raises(ValueError, match="missing_manifest"):
         LeRobotPackageImporter().import_package(request)
+
+
+def test_lerobot_package_importer_returns_validation_warning_code_and_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    import physical_ai_data.lerobot_loader as lerobot_loader
+    import physical_ai_data.lerobot_adapter as lerobot_adapter
+
+    def fake_loader(
+        repo_id: str,
+        episode_index: int,
+        root: str | Path | None = None,
+        profile: str = "auto",
+        max_frames: int | None = None,
+        camera: str | None = None,
+    ) -> LeRobotEpisode:
+        return _episode(tmp_path)
+
+    def fake_validate_package(package_root: str | Path) -> ValidationResult:
+        return ValidationResult(
+            warnings=[
+                ValidationMessage(
+                    "recommended_artifact_dir_missing",
+                    "Missing artifacts/images",
+                    str(package_root),
+                )
+            ],
+            summary={"frame_count": 1},
+        )
+
+    monkeypatch.setattr(lerobot_loader, "load_lerobot_episode", fake_loader)
+    monkeypatch.setattr(lerobot_adapter, "validate_package", fake_validate_package)
+    request = ImportRequest(
+        source_format="lerobot",
+        source={"repo_id": "lerobot/pusht", "episode_index": 7},
+        output_dir=tmp_path / "package",
+    )
+
+    result = LeRobotPackageImporter().import_package(request)
+
+    assert result.warnings == ["recommended_artifact_dir_missing: Missing artifacts/images"]
