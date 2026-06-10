@@ -229,6 +229,47 @@ def test_export_training_eval_draft_leaves_primary_artifact_empty_for_missing_ca
     assert rows[0]["primary_artifact_ref"] == ""
 
 
+def test_export_training_eval_draft_uses_ordered_primary_artifact_fallback(tmp_path: Path):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=13)
+    frame_rows = _rows(package / "frames.csv")
+    frame_rows[0]["image_ref"] = ""
+    frame_rows[1]["image_ref"] = ""
+    frame_rows[1]["point_cloud_ref"] = ""
+    _write_rows(package / "frames.csv", list(frame_rows[0].keys()), frame_rows)
+    _write_rows(
+        package / "derived" / "candidates.csv",
+        CANDIDATE_COLUMNS,
+        [
+            {
+                "candidate_id": "candidate_point_cloud",
+                "source_type": "event",
+                "source_id": "event_point_cloud",
+                "frame_id": frame_rows[0]["frame_id"],
+                "object_id": "",
+                "timestamp_s": frame_rows[0]["timestamp_s"],
+                "reasons": "precomputed",
+                "score": "0.42",
+            },
+            {
+                "candidate_id": "candidate_trajectory",
+                "source_type": "event",
+                "source_id": "event_trajectory",
+                "frame_id": frame_rows[1]["frame_id"],
+                "object_id": "",
+                "timestamp_s": frame_rows[1]["timestamp_s"],
+                "reasons": "precomputed",
+                "score": "0.43",
+            },
+        ],
+    )
+
+    output = export_training_eval_draft(package)
+
+    rows = _rows(output / "samples.csv")
+    assert rows[0]["primary_artifact_ref"] == "artifacts/point_clouds/workpiece.csv"
+    assert rows[1]["primary_artifact_ref"] == "artifacts/trajectories/tcp_path.csv"
+
+
 def test_export_training_eval_draft_rejects_invalid_package_with_validator_code(tmp_path: Path):
     with pytest.raises(ValueError, match="missing_manifest"):
         export_training_eval_draft(tmp_path)

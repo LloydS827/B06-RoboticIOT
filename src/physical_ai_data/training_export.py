@@ -129,7 +129,7 @@ def _manifest(
         "samples_csv": "samples.csv",
         "sample_count": candidate_count,
         "candidate_count": candidate_count,
-        "notes": "This draft export is not a formal training framework format.",
+        "notes": "This draft export is a Physical AI Package draft sample index, not a formal training framework format.",
         "created_at": datetime.now(UTC)
         .replace(microsecond=0)
         .isoformat()
