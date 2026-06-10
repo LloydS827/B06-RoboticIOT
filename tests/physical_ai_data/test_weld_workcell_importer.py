@@ -5,6 +5,8 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 from physical_ai_data.candidates import export_candidates, summarize_package
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.package_io import read_json
@@ -25,6 +27,35 @@ def _write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) ->
 def _rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as file:
         return list(csv.DictReader(file))
+
+
+def _fieldnames(path: Path) -> list[str]:
+    with path.open(newline="", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        return list(reader.fieldnames or [])
+
+
+def _rewrite_csv_without_column(path: Path, missing: str) -> None:
+    fieldnames = [field for field in _fieldnames(path) if field != missing]
+    rows = [{field: row[field] for field in fieldnames} for row in _rows(path)]
+    _write_csv(path, fieldnames, rows)
+
+
+def _rewrite_csv_value(path: Path, row_index: int, column: str, value: str) -> None:
+    fieldnames = _fieldnames(path)
+    rows = _rows(path)
+    rows[row_index][column] = value
+    _write_csv(path, fieldnames, rows)
+
+
+def _import_weld_source(source: Path, package: Path, *, copy_images: bool = True):
+    request = ImportRequest(
+        source_format="weld_workcell",
+        source={"root": source},
+        output_dir=package,
+        options={"copy_images": copy_images},
+    )
+    return run_import(WeldWorkcellPackageImporter(), request)
 
 
 def _write_weld_source(root: Path, *, include_review_labels: bool = True) -> Path:
@@ -306,3 +337,170 @@ def test_weld_workcell_importer_outputs_pipeline_compatible_package(tmp_path: Pa
     assert training_eval_manifest["export_format"] == "physical-ai-training-eval-draft/v0.2"
     assert rrd.exists()
     assert rrd.stat().st_size > 0
+
+
+def test_weld_workcell_importer_rejects_source_format_mismatch(tmp_path: Path):
+    request = ImportRequest(
+        source_format="other",
+        source={},
+        output_dir=tmp_path / "package",
+        options={},
+    )
+
+    with pytest.raises(ValueError, match="cannot handle other"):
+        run_import(WeldWorkcellPackageImporter(), request)
+
+
+def test_weld_workcell_importer_requires_process_csv(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    (source / "process.csv").unlink()
+
+    with pytest.raises(ValueError, match="source.root must contain process.csv"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_requires_robot_id(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    job = json.loads((source / "job.json").read_text(encoding="utf-8"))
+    job.pop("robot_id")
+    (source / "job.json").write_text(json.dumps(job) + "\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="job.json missing required fields: robot_id"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_requires_frames_tcp_x_column(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_without_column(source / "frames.csv", "tcp_x")
+
+    with pytest.raises(ValueError, match="frames.csv missing required columns: tcp_x"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_requires_process_weld_current_column(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_without_column(source / "process.csv", "weld_current_a")
+
+    with pytest.raises(ValueError, match="process.csv missing required columns: weld_current_a"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_requires_review_label_confidence_column(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_without_column(source / "review_labels.csv", "confidence")
+
+    with pytest.raises(ValueError, match="review_labels.csv missing required columns: confidence"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_rejects_malformed_events_rows(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    (source / "events.csv").write_text(
+        "timestamp_s,event_type,severity,message,object_id\n"
+        "0.31,arc_start,info,Arc stabilized,seam_root,extra\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="events.csv has malformed rows"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_rejects_nonfinite_process_numeric(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "process.csv", 0, "weld_current_a", "nan")
+
+    with pytest.raises(ValueError, match="weld_current_a must be a finite number"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_rejects_nonfinite_review_label_confidence(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "review_labels.csv", 0, "confidence", "inf")
+
+    with pytest.raises(ValueError, match="confidence must be a finite number"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+@pytest.mark.parametrize(
+    ("image_path", "message"),
+    [
+        ("/tmp/front_0000.png", "image_path must be relative to source.root"),
+        ("../front_0000.png", "image_path must be relative to source.root"),
+        ("images/missing.png", "source image does not exist"),
+    ],
+)
+@pytest.mark.parametrize("copy_images", [True, False])
+def test_weld_workcell_importer_rejects_invalid_image_paths(
+    tmp_path: Path,
+    image_path: str,
+    message: str,
+    copy_images: bool,
+):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "frames.csv", 0, "image_path", image_path)
+
+    with pytest.raises(ValueError, match=message):
+        _import_weld_source(source, tmp_path / "package", copy_images=copy_images)
+
+
+def test_weld_workcell_importer_rejects_symlink_escape_image(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    outside = tmp_path / "outside.png"
+    outside.write_bytes((source / "images/front_0000.png").read_bytes())
+    (source / "images/escape.png").symlink_to(outside)
+    _rewrite_csv_value(source / "frames.csv", 0, "image_path", "images/escape.png")
+
+    with pytest.raises(ValueError, match="image_path must be relative to source.root"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_requires_frame_data_rows(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _write_csv(source / "frames.csv", _fieldnames(source / "frames.csv"), [])
+
+    with pytest.raises(ValueError, match="frames.csv must contain at least one data row"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_rejects_unknown_event_object_id(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _rewrite_csv_value(source / "events.csv", 0, "object_id", "unknown_fixture")
+
+    with pytest.raises(ValueError, match="events.csv object_id must be one of"):
+        _import_weld_source(source, tmp_path / "package")
+
+
+def test_weld_workcell_importer_uses_nearest_frame_edges_and_earlier_tie(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    _write_csv(
+        source / "events.csv",
+        ["timestamp_s", "event_type", "severity", "message", "object_id"],
+        [
+            {
+                "timestamp_s": "-0.1",
+                "event_type": "before_first",
+                "severity": "info",
+                "message": "",
+                "object_id": "seam_root",
+            },
+            {
+                "timestamp_s": "0.1",
+                "event_type": "exact_tie",
+                "severity": "info",
+                "message": "",
+                "object_id": "seam_root",
+            },
+            {
+                "timestamp_s": "0.9",
+                "event_type": "after_last",
+                "severity": "info",
+                "message": "",
+                "object_id": "seam_root",
+            },
+        ],
+    )
+
+    _import_weld_source(source, tmp_path / "package")
+
+    event_rows = _rows(tmp_path / "package/events.csv")
+    assert [row["related_frame_id"] for row in event_rows] == ["frame_0000", "frame_0000", "frame_0002"]

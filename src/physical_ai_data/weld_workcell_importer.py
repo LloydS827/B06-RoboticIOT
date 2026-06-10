@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import math
 import shutil
 from datetime import UTC, datetime
@@ -96,30 +97,29 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
     _validate_columns(source_events, source_root / "events.csv", EVENT_REQUIRED_COLUMNS)
     if has_review_labels:
         _validate_columns(source_labels, source_root / "review_labels.csv", LABEL_REQUIRED_COLUMNS)
-    _validate_rows(source_frames, "frames.csv")
-    _validate_rows(source_process, "process.csv")
-    _validate_rows(source_events, "events.csv")
-    _validate_rows(source_labels, "review_labels.csv")
+    _validate_rows(source_frames, source_root / "frames.csv")
+    _validate_rows(source_process, source_root / "process.csv")
+    _validate_rows(source_events, source_root / "events.csv")
+    _validate_rows(source_labels, source_root / "review_labels.csv")
     if not source_frames:
-        raise ValueError("frames.csv must contain at least one row")
-
-    package_root = Path(output_dir)
-    _prepare_package(package_root)
-    _copy_source_files(source_root, package_root)
+        raise ValueError("frames.csv must contain at least one data row")
 
     frame_rows: list[dict[str, object]] = []
     trajectory_rows: list[dict[str, object]] = []
+    image_copies: list[tuple[str, str]] = []
     for index, frame in enumerate(source_frames):
         frame_id = f"frame_{index:04d}"
         timestamp_s = frame["timestamp_s"].strip()
         _finite_float(timestamp_s, "frames.csv timestamp_s")
         image_ref = _copy_image(
             source_root,
-            package_root,
+            None,
             frame.get("image_path", ""),
             frame_id=frame_id,
             copy_images=copy_images,
         )
+        if image_ref:
+            image_copies.append((frame_id, frame.get("image_path", "")))
         frame_rows.append(
             {
                 "frame_id": frame_id,
@@ -151,6 +151,12 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
     event_rows = _event_rows(source_events, frame_rows, job)
     label_rows = _label_rows(source_labels, frame_rows)
     converted_at = _utc_now()
+
+    package_root = Path(output_dir)
+    _prepare_package(package_root)
+    _copy_source_files(source_root, package_root)
+    for frame_id, image_path in image_copies:
+        _copy_image(source_root, package_root, image_path, frame_id=frame_id, copy_images=True)
 
     write_json(
         package_root / MANIFEST_FILENAME,
@@ -204,7 +210,7 @@ def _event_rows(source_events: list[dict[str, str]], frames: list[dict[str, obje
         timestamp = _finite_float(timestamp_s, "events.csv timestamp_s")
         object_id = event.get("object_id", "").strip()
         if object_id and object_id not in known_objects:
-            raise ValueError(f"events.csv object_id references unknown object: {object_id}")
+            raise ValueError(f"events.csv object_id must be one of {sorted(known_objects)}: {object_id}")
         rows.append(
             {
                 "event_id": f"event_{len(rows):04d}",
@@ -274,24 +280,24 @@ def _copy_source_files(source_root: Path, package_root: Path) -> None:
             shutil.copyfile(source_file, package_root / "artifacts/source" / filename)
 
 
-def _copy_image(source_root: Path, package_root: Path, image_path: str, *, frame_id: str, copy_images: bool) -> str:
+def _copy_image(source_root: Path, package_root: Path | None, image_path: str, *, frame_id: str, copy_images: bool) -> str:
     image_path = image_path.strip()
     if not image_path:
         return ""
 
     relative_image = _source_relative_path(image_path)
-    if not copy_images:
-        return ""
-
     resolved_source_root = source_root.resolve()
     source_image = (resolved_source_root / relative_image).resolve()
     if not source_image.is_relative_to(resolved_source_root):
         raise ValueError("image_path must be relative to source.root")
-    if not source_image.exists():
+    if not source_image.is_file():
         raise ValueError(f"source image does not exist: {image_path}")
+    if not copy_images:
+        return ""
 
     image_ref = f"artifacts/images/{frame_id}{relative_image.suffix}"
-    shutil.copyfile(source_image, package_root / image_ref)
+    if package_root is not None:
+        shutil.copyfile(source_image, package_root / image_ref)
     return image_ref
 
 
@@ -394,8 +400,14 @@ def _optional_bool(values: Mapping[str, object], key: str, *, default: bool) -> 
 
 def _validate_source_files(source_root: Path) -> None:
     for filename in SOURCE_FILES:
-        if not (source_root / filename).exists():
-            raise ValueError(f"source.root must contain {filename}")
+        _require_source_file(source_root, filename)
+
+
+def _require_source_file(source_root: Path, filename: str) -> Path:
+    path = source_root / filename
+    if not path.is_file():
+        raise ValueError(f"source.root must contain {filename}")
+    return path
 
 
 def _validate_job(job: Mapping[str, object]) -> None:
@@ -411,16 +423,18 @@ def _validate_columns(rows: list[dict[str, str]], path: Path, required_columns: 
         raise ValueError(f"{path.name} missing required columns: {', '.join(missing)}")
 
 
-def _validate_rows(rows: list[dict[str, str]], filename: str) -> None:
+def _validate_rows(rows: list[dict[str, str]], path: Path) -> None:
     for row in rows:
         if None in row or any(value is None for value in row.values()):
-            raise ValueError(f"{filename} has malformed rows")
+            raise ValueError(f"{path.name} has malformed rows")
 
 
 def _read_csv_header(path: Path) -> set[str]:
     with path.open(newline="", encoding="utf-8") as file:
-        header = file.readline().strip()
-    return set(header.split(",")) if header else set()
+        try:
+            return set(next(csv.reader(file)))
+        except StopIteration:
+            return set()
 
 
 def _nearest_frame_id(frames: list[dict[str, object]], timestamp_s: float) -> str:
