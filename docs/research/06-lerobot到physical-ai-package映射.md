@@ -14,6 +14,7 @@
 | `frame_index` / `frame.idx` / `index` | 记录源 frame index，写入 `frames.csv` 的 `source_frame_index`。 |
 | `timestamp` / `timestamp_s` | 优先作为 `timestamp_s`；缺失时按 fps 与 frame index 生成时间戳。 |
 | `observation.image*` 或 key 中包含 `image` 的字段 | 提取图像 artifact，并按相机名写入 `artifacts/images/<camera>/`。 |
+| metadata `video_keys` + `get_video_file_path(...)` | 当 LeRobot 行数据未直接返回图像、但 metadata 暴露视频相机时，按相机解码视频帧到临时 PNG，再写入 `artifacts/images/<camera>/`。 |
 | `observation.state` / `state` | 写入 `artifacts/source/frame_state_action.csv` 的 `state_json`，并生成 `state_norm` metric。 |
 | `action` | 写入 `artifacts/source/frame_state_action.csv` 的 `action_json`，并生成 `action_norm` 与 `action_delta` metric。 |
 | `task` 与 tasks metadata | 写入 task metadata，并作为任务上下文 label 的候选来源。 |
@@ -21,6 +22,27 @@
 | `stats` | 保存为 `artifacts/source/lerobot_stats.json`。 |
 | episode metadata | 保存为 `artifacts/source/lerobot_episode_metadata.json`。 |
 | task metadata | 保存为 `artifacts/source/lerobot_task_metadata.json`。 |
+
+## 真实数据观察字段
+
+下表汇总 Stage 4.1 的真实数据观察：Task 2 使用 `load_lerobot_episode` 做少量 frame 预检，Task 4 记录 ALOHA representative smoke，Task 5 记录 PushT full acceptance。观察结果如下：
+
+| repo | profile | max frames | 实际 frames | fps | row/features 字段 | state/action 维度 | 图像相机 |
+| --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| `lerobot/pusht` | `pusht` | 3 | 3 | 30.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `next.reward`, `next.success`, `observation.state`, `task_index`, `timestamp` | 2 / 2 | 无 |
+| `lerobot/pusht` | `pusht` | 不限制 | 161 | 30.0 | 同上；Task 5 full acceptance 观察到末帧 `frame_0160` / `source_frame_index=160` / `timestamp_s=16.0` | 2 / 2 | 无，`image_ref` 为空且 `image_refs_json={}` |
+| `lerobot/aloha_sim_transfer_cube_human` | `aloha` | 2 | 2 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | 14 / 14 | metadata 仅暴露 `top` 单相机视频，预检 frame 中无已解码图像引用 |
+| `lerobot/aloha_static_towel` | `aloha` | 60 | 60 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.effort`, `observation.images.cam_high`, `observation.images.cam_left_wrist`, `observation.images.cam_low`, `observation.images.cam_right_wrist`, `observation.state`, `task_index`, `timestamp` | 14 / 14 | `cam_high`, `cam_left_wrist`, `cam_low`, `cam_right_wrist` |
+
+与 fake fixture 的差异：
+
+- `lerobot/pusht` 在 LeRobot 0.4.4 下被识别为 2.1 格式，`LeRobotDataset` 默认以 v3.0 codebase 打开时会抛 `BackwardCompatibilityError`；loader 仅在该明确旧格式错误下 fallback 到 Hugging Face `datasets.load_dataset(..., split="train", streaming=True)` 读取 parquet 行。
+- `lerobot/pusht` full acceptance 不加 `--max-frames` 时导入 161 帧，字段形态与 quick smoke 一致：无图像相机、state/action 维度为 2 / 2、`image_available` 为 0，未发现需要新增 PushT 专用字段。
+- `lerobot/aloha_sim_transfer_cube_human` 可通过 `LeRobotDataset` 打开 metadata/parquet，但 `meta.tasks` 等 metadata 可能是 pandas DataFrame，需要先归一化为普通 `list[dict]`/`dict` 后保存。
+- `lerobot/aloha_sim_transfer_cube_human` 的 `features`/`stats` 暴露 `observation.images.top`，但这是单相机视频字段，不满足 ALOHA representative smoke 的多相机要求。
+- `lerobot/aloha_static_towel` 的 `hf_dataset` 行同样不直接返回图像字段，但 metadata 暴露 4 个 video camera keys；loader 仅按 metadata 明确给出的 `video_keys` 和视频文件路径解码图像帧，不推断额外相机或伪造 refs。
+- 直接走 `LeRobotDataset.__getitem__` 仍可能进入 TorchCodec 视频解码路径；当前 loader 使用 PyAV 解码 metadata 视频文件，绕开本机 TorchCodec/FFmpeg 动态库问题。
+- 真实行使用 `task_index`，预检首行没有直接 `task` 字符串，因此 `task_name` 为空；adapter 仍只在源数据明确给出 `task` 时写任务名，不从 `task_index` 猜测语义。
 
 ## Manifest 映射
 
@@ -113,7 +135,7 @@ ALOHA profile 用于代表性 smoke：
 
 - `phase` 写为 `manipulation`。
 - manifest `objects` 使用保守的 `task_object`。
-- 多相机图像通过 `image_refs_json` 保留，Rerun adapter 可读取额外相机引用。
+- 多相机图像通过 `image_refs_json` 保留，Rerun adapter 可读取额外相机引用；Task 4 使用 `lerobot/aloha_static_towel` 观察到 `cam_high`、`cam_left_wrist`、`cam_low`、`cam_right_wrist`。
 - state/action 保持数组形式，不在第一版中推断双臂关节名、夹爪状态或相机标定。
 
 ### Fallback Profile

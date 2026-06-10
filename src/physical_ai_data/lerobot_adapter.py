@@ -6,6 +6,7 @@ import shutil
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+import tempfile
 from typing import Mapping, Sequence
 
 from physical_ai_data.lerobot_profiles import LeRobotProfile, select_lerobot_profile
@@ -40,6 +41,15 @@ class LeRobotEpisode:
     stats: Mapping[str, object] = field(default_factory=dict)
     episode_metadata: Mapping[str, object] = field(default_factory=dict)
     task_metadata: Mapping[str, object] = field(default_factory=dict)
+    temporary_directories: Sequence[tempfile.TemporaryDirectory[str]] = field(
+        default_factory=list,
+        compare=False,
+        repr=False,
+    )
+
+    def close(self) -> None:
+        for temporary_directory in self.temporary_directories:
+            temporary_directory.cleanup()
 
 
 def import_lerobot_episode(

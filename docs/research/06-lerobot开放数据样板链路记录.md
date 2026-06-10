@@ -12,6 +12,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - 新增 `pusht`、`aloha`、`fallback` profile，分别覆盖 PushT 主验收、ALOHA 代表性 smoke 和未知 LeRobot repo 的保守映射。
 - 新增 lazy LeRobot loader，只有执行真实 `import-lerobot` 时才导入 LeRobot。
 - 新增 CLI 子命令 `import-lerobot`，支持 `--repo-id`、`--episode-index`、`--output-dir`、`--root`、`--profile`、`--max-frames`、`--camera`。
+- LeRobot loader 支持从 metadata `video_keys` 和 `get_video_file_path(...)` 提取真实视频相机帧；当行数据没有已解码图像字段时，可按 metadata 明确列出的相机解码为临时 PNG，再写入 package 图像 artifact。
 - Rerun adapter 已支持读取 `image_refs_json` 中的额外相机引用，用于多相机 LeRobot 数据包回放。
 - candidate export 已扩展 LeRobot 相关候选关键字，例如 `action_delta`、`timestamp_gap` 和 `image_missing`；当前 adapter 直接生成 `action_norm`、`state_norm`、`action_delta` 和 `image_available` 等基础 metric。
 
@@ -21,25 +22,394 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - `PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --help`：通过，帮助输出包含 `--repo-id`、`--episode-index`、`--output-dir`、`--profile`、`--max-frames` 和 `--camera`。
 - 默认测试不需要安装 LeRobot，不访问网络、缓存或真实数据集。
 
-## PushT Full Acceptance 结果
+## Stage 4.1 uv 环境
+
+- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证；Task 4 已完成 ALOHA representative smoke 多相机验证；Task 5 已完成 PushT full acceptance 尝试，命令链路通过。Viewer native GUI 人工视觉验收未完成，原因见下方 Task 5 记录。
+- 工作区检查：`git status --short` 初始输出为空，未发现需要保留的既有改动。
+- `uv` 可用性：
+  - `command -v uv`：`/Users/lloyd/.local/bin/uv`
+  - `uv --version`：`uv 0.11.17 (a33a629d6 2026-05-28 aarch64-apple-darwin)`
+- 初始解析失败核心原因：项目默认依赖 `rerun-sdk[dataplatform]>=0.33.0`，而当前可解析的 LeRobot 版本要求较旧的 `rerun-sdk`：
+  - `lerobot>=0.3.0,<0.4.0` 依赖 `rerun-sdk>=0.21.0,<0.23.0`
+  - `lerobot>=0.4.0` 依赖 `rerun-sdk>=0.24.0,<0.27.0`
+  - 因此 `b06-physical-ai-data-layer[lerobot]` 与项目已有 `rerun-sdk[dataplatform]>=0.33.0` 约束不可同时满足。
+- 解决方式：在 `pyproject.toml` 新增 `tool.uv.override-dependencies = ["rerun-sdk[dataplatform]>=0.33.0"]`，让 LeRobot dataset loader 与项目 Rerun 0.33 baseline 在独立 `uv` 环境中共存。
+  - 该 override 不降低项目 Rerun baseline。
+  - 该 override 不把 LeRobot 变成默认依赖；LeRobot 仍只在 `lerobot` extra 中安装。
+  - 未收窄 `requires-python`。
+- 环境建立：
+  - `uv lock`：通过，`Resolved 124 packages in 479ms`，生成 `uv.lock`。
+  - `uv sync --extra dev --extra lerobot`：通过，`Installed 102 packages`。
+- 运行版本：
+  - `uv run python --version`：`Python 3.13.5`
+  - `lerobot==0.4.4`
+  - `rerun-sdk==0.33.0`
+  - `datasets==4.8.5`
+  - `huggingface_hub==0.35.3`
+- `LeRobotDataset` import path 探测：
+  - 可用：`lerobot.datasets.lerobot_dataset -> <class 'lerobot.datasets.lerobot_dataset.LeRobotDataset'>`
+  - 不可用：`lerobot.common.datasets.lerobot_dataset`，`ModuleNotFoundError: No module named 'lerobot.common'`
+- 环境变量与真实解析 cache 路径：
+  - `HF_HOME=`、`HF_HUB_CACHE=`、`HF_DATASETS_CACHE=`、`LEROBOT_HOME=`、`LEROBOT_DATA_HOME=` 均为空。
+  - `huggingface_hub.HF_HOME=/Users/lloyd/.cache/huggingface`
+  - `huggingface_hub.HF_HUB_CACHE=/Users/lloyd/.cache/huggingface/hub`
+  - `datasets.HF_DATASETS_CACHE=/Users/lloyd/.cache/huggingface/datasets`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface exists=True`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface/hub exists=True`
+  - `CACHE_PATH /Users/lloyd/.cache/huggingface/datasets exists=False`
+  - `CACHE_PATH /Users/lloyd/.cache/lerobot exists=False`
+- Hugging Face dataset metadata 网络探测：
+  - `HF_DATASET_OK lerobot/pusht sha=7628202a2180972f291ba1bc6723834921e72c19 files=8`
+  - `HF_DATASET_OK lerobot/aloha_sim_transfer_cube_human sha=6a43d500f101255823a9d2b9dc244eeb01a2cd31 files=10`
+- `uv` 环境回归测试：`uv run python -m pytest -q` 返回 `92 passed in 11.90s`。
+- 默认非 LeRobot workflow 验证：
+  - `python3 --version`：`Python 3.9.6`
+  - `python3 -m pip --version`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pip`
+  - `python3 -m pip install -e ".[dev]"`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pip`
+  - `PYTHONPATH=src python3 -m pytest -q`：失败，`/Library/Developer/CommandLineTools/usr/bin/python3: No module named pytest`
+  - 最接近的非 LeRobot 检查：用 `/tmp/stage4_1_default_dev_venv` 临时环境只安装 `.[dev]`，并将该 venv 的 `bin` 放到 `PATH` 前面后运行 `PYTHONPATH=src /tmp/stage4_1_default_dev_venv/bin/python -m pytest -q`，返回 `92 passed in 5.39s`。
+  - 临时默认 dev 环境检查：`lerobot_installed=False`。
+  - 判断：默认安装路径不需要 LeRobot；本轮未把默认依赖改成包含 LeRobot。
+- sync 后 cache/环境占用与磁盘状态：
+  - `du -sh /Users/lloyd/.cache/huggingface`：`1.0G`
+  - `du -sh /Users/lloyd/.cache/huggingface/hub`：`1.0G`
+  - `/Users/lloyd/.cache/huggingface/datasets`：不存在。
+  - `/Users/lloyd/.cache/lerobot`：不存在。
+  - `du -sh .venv`：`1.6G`
+  - `df -h .`：`/dev/disk3s5 460Gi 171Gi 251Gi 41% /System/Volumes/Data`
+- 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
+- 本文保留 Stage 4.1 环境建立前的历史阻塞记录，并在后续 Task 3、Task 4、Task 5 小节记录真实全链路结果；同名“历史记录”小节不代表当前验收状态。
+
+## Task 2 真实 Loader Preflight
+
+- 命令：`uv run python - <<'PY' ... load_lerobot_episode(...) ... PY`，分别加载：
+  - `repo_id="lerobot/pusht"`，`episode_index=0`，`profile="pusht"`，`max_frames=3`
+  - `repo_id="lerobot/aloha_sim_transfer_cube_human"`，`episode_index=0`，`profile="aloha"`，`max_frames=2`
+- 初始结果：PushT 在 `LeRobotDataset` 初始化阶段失败，错误为：
+
+```text
+lerobot.datasets.backward_compatibility.BackwardCompatibilityError:
+The dataset you requested (lerobot/pusht) is in 2.1 format.
+
+We introduced a new format since v3.0 which is not backward compatible with v2.1.
+```
+
+- 修复：`lerobot_loader.py` 仅在捕获 LeRobot `BackwardCompatibilityError` 时 fallback 到 `datasets.load_dataset(repo_id, split="train", streaming=True)` 读取旧格式 parquet 行；保留原有 `LeRobotDataset` 当前/legacy import path 和 constructor fallback。
+- 第二次预检中 ALOHA 能读取 frame，但在 task metadata 归一化处失败：
+
+```text
+ValueError: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+```
+
+- 修复：`lerobot_loader.py` 的 `_normalize` 支持 DataFrame-like `to_dict(orient="records")`，把 `meta.tasks` 等 metadata 转为普通 Python 数据再保存，不推断任务语义。
+- 修复后的最终 preflight 输出摘要：
+
+| repo | episode | max frames | frame count | fps | features keys | stats keys | camera names | state/action dims |
+| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- |
+| `lerobot/pusht` | 0 | 3 | 3 | 30.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `next.reward`, `next.success`, `observation.state`, `task_index`, `timestamp` | 无 | 无 | 2 / 2 |
+| `lerobot/aloha_sim_transfer_cube_human` | 0 | 2 | 2 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | 预检 frame 未返回已解码图像引用 | 14 / 14 |
+
+- 图像限制：ALOHA metadata 暴露 `observation.images.top`，但当前 loader preflight 通过 `hf_dataset` 行读取到的是非图像核心字段；直接调用 `LeRobotDataset.__getitem__` 会进入 TorchCodec 视频解码路径，并在本机失败：
+
+```text
+RuntimeError: Could not load libtorchcodec.
+Likely causes:
+1. FFmpeg is not properly installed in your environment.
+2. The PyTorch version (2.10.0) is not compatible with this version of TorchCodec.
+```
+
+- 本任务不修复 TorchCodec/FFmpeg 环境问题，也不伪造图像相机；记录为后续真实视频帧 smoke 的环境关注项。
+- 测试结果：
+  - 新增旧格式 fallback fake fixture：先失败于 `FakeBackwardCompatibilityError: dataset is in 2.1 format`，修复后通过。
+  - 新增 DataFrame-like task metadata fake fixture：先失败于 `ValueError: truth value is ambiguous`，修复后通过。
+  - 新增 HF fallback feature serialization fake fixture：先失败于 `FakeFeature` 不可 JSON 序列化，修复后 `json.dumps(dict(episode.features))` 通过。
+  - 新增非 `BackwardCompatibilityError` re-raise fake fixture：确认普通构造错误不会被 HF fallback 吞掉。
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py -q`：通过。
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_adapter.py -q`：`20 passed in 0.13s`
+  - `uv run python -m pytest -q`：`96 passed in 2.50s`
+  - 最小真实 PushT 检查：`lerobot/pusht`、`max_frames=1` 可加载 1 帧，`json.dumps(dict(episode.features))` 成功。
+
+## 历史记录：PushT Full Acceptance 结果
 
 - 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/pusht --episode-index 0 --output-dir artifacts/stage4/final_pusht_episode_0000 --profile pusht`
 - 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
 - stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
 - 因导入未完成，未生成 package，后续 validate/summarize/export-candidates/convert-rerun/`rerun rrd verify` 未运行。
 
-## PushT Quick Smoke 结果
+## Task 5：PushT Full Acceptance 尝试与 Viewer/Blueprint 检查
 
-- 本轮未运行 quick smoke。
-- 原因：full acceptance 的阻塞不是下载体积、网络或时间限制，而是本地缺少 `lerobot` 可选依赖；quick smoke 会在同一依赖检查处失败。
+执行前资源状态：
+
+- `df -h .`：`/dev/disk3s5 460Gi 174Gi 248Gi 42% /System/Volumes/Data`
+- `du -sh artifacts`：`243M artifacts`
+- `git status --short --branch`：`## codex/stage4-1-lerobot-real-data-smoke`
+
+清理并重建 full acceptance 目标：
+
+```bash
+rm -rf artifacts/stage4/pusht_episode_0000 artifacts/stage4/pusht_episode_0000.rrd
+mkdir -p artifacts/stage4/pusht_episode_0000
+```
+
+导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/pusht \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/pusht_episode_0000 \
+  --profile pusht
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/pusht_episode_0000`。
+- 包路径：`artifacts/stage4/pusht_episode_0000`。
+- 包大小：`112K`。
+- Rerun 路径：`artifacts/stage4/pusht_episode_0000.rrd`。
+
+validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate --json artifacts/stage4/pusht_episode_0000
+```
+
+- 结果：`"ok": true`，无 errors/warnings。
+- 关键摘要：`frame_count: 161`，`event_count: 2`，`label_count: 1`，`metric_count: 644`，`artifact_ref_count: 162`。
+
+summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize --json artifacts/stage4/pusht_episode_0000
+```
+
+- 结果：`scenario_type: open_robot_manipulation`，`frame_count: 161`，`artifact_ref_count: 162`。
+- phase：`pushing`。
+- event types：`episode_start`、`episode_end`。
+- metric names：`action_delta`、`action_norm`、`image_available`、`state_norm`。
+
+candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_episode_0000
+wc -l artifacts/stage4/pusht_episode_0000/derived/candidates.csv
+```
+
+- 结果：通过，写出 `artifacts/stage4/pusht_episode_0000/derived/candidates.csv`。
+- `wc -l` 输出 `149`，扣除表头后候选数量为 148。
+
+Rerun 转换与 full `.rrd` 校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/pusht_episode_0000 \
+  --output-rrd artifacts/stage4/pusht_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/pusht_episode_0000.rrd
+```
+
+- 转换结果：通过，写出 `artifacts/stage4/pusht_episode_0000.rrd`。
+- `rerun rrd verify`：`1 file verified without error.`
+
+既有 quick PushT 与 ALOHA representative `.rrd` 复核：
+
+```bash
+uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/aloha_representative_episode_0000.rrd
+```
+
+- PushT quick：`1 file verified without error.`
+- ALOHA representative：`1 file verified without error.`
+
+Viewer/Blueprint 检查：
+
+- `DISPLAY` 与 `WAYLAND_DISPLAY` 均为空；当前为 macOS 自动化执行环境。
+- 仓库内未发现项目自定义 `.rbl` blueprint 文件；仅有 `docs/stage2/viewer_blueprint_checklist.md` 和依赖包内 blueprint 代码。
+- native GUI Viewer 截图探测命令：
+
+```bash
+uv run rerun artifacts/stage4/pusht_episode_0000.rrd \
+  --screenshot-to /tmp/pusht_full_viewer_check.png \
+  --window-size 1280x720
+```
+
+- 结果：失败，exit code `102`。stderr 关键错误为 `Wgpu validation error`，`Surface` 请求尺寸 `(20000, 1682)`，超过最大纹理尺寸 `16384`，随后 panic：`Failed to take store hub from the Viewer`。
+- headless Viewer 截图探测命令：
+
+```bash
+uv run rerun artifacts/stage4/pusht_episode_0000.rrd \
+  --headless \
+  --screenshot-to /tmp/pusht_full_viewer_check_headless.png \
+  --window-size 1280x720
+```
+
+- 结果：通过，exit code `0`，生成 `/tmp/pusht_full_viewer_check_headless.png`，文件大小约 `553K`。
+- 结论：本轮只能证明 `.rrd` 通过 Rerun verify，且可被 Viewer headless 渲染路径读取；未完成人工视觉验收。不能把 `rerun rrd verify` 或 headless 截图替代人工 Viewer/Blueprint 验收。后续需要在可稳定启动 native GUI 或 web viewer 的环境中检查时间线、实体树、指标曲线、事件显示和布局保存。
+
+执行后资源状态：
+
+- `du -sh artifacts`：`243M artifacts`
+- `git status --short`：无输出；full package、`.rrd`、cache 和本地环境未进入 git 跟踪。
+
+## Task 3：PushT Quick Smoke 全链路验证
+
+- 清理旧生成物：
+
+```bash
+rm -rf artifacts/stage4/pusht_quick_episode_0000 artifacts/stage4/pusht_quick_episode_0000.rrd
+```
+
+- 导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/pusht \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/pusht_quick_episode_0000 \
+  --profile pusht \
+  --max-frames 120
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/pusht_quick_episode_0000`。
+- 包路径：`artifacts/stage4/pusht_quick_episode_0000`。
+- Rerun 路径：`artifacts/stage4/pusht_quick_episode_0000.rrd`。
+- 测试与复跑：
+  - `uv run python -m pytest -q`：`96 passed in 2.43s`。
+  - 再次运行同一 PushT quick import：通过。
+- validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/pusht_quick_episode_0000 --json
+```
+
+  - 结果：`"ok": true`，`frame_count: 120`，`artifact_ref_count: 121`，无 errors/warnings。
+- summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/pusht_quick_episode_0000 --json
+```
+
+  - 结果：`scenario_type: open_robot_manipulation`，`frame_count: 120`，metrics 包含 `action_delta`、`action_norm`、`image_available`、`state_norm`。
+- candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_quick_episode_0000
+```
+
+  - 结果：通过，写出 `artifacts/stage4/pusht_quick_episode_0000/derived/candidates.csv`。
+  - 候选数量：116。
+- Rerun 转换与校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/pusht_quick_episode_0000 \
+  --output-rrd artifacts/stage4/pusht_quick_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
+```
+
+  - 转换结果：通过，写出 `.rrd`。
+  - `rerun rrd verify`：`1 file verified without error.`
+- 包结构检查：
+  - `source_dataset.repo_id`: `lerobot/pusht`。
+  - `source_dataset.episode_index`: 0。
+  - `source_dataset.profile`: `pusht`。
+  - `source_dataset.fps`: 30.0。
+  - frame 数：120。
+  - 相机名：无。
+  - state/action 维度：2 / 2。
+  - 第一帧：`robot_state_ref=artifacts/source/frame_state_action.csv`，`image_ref` 为空，`image_refs_json={}`。
+  - `image_available` 取值：`0.0`，表示本轮 PushT quick package 未生成图像引用；不伪造相机或图像 artifact。
+  - metric names：`action_delta`、`action_norm`、`image_available`、`state_norm`。
+
+## 历史记录：PushT Quick Smoke 结果
+
+- Stage 4.1 环境建立前曾因本地缺少 `lerobot` 可选依赖而未运行 quick smoke；该状态已由上方 Task 3 真实验证结果取代。
 - quick smoke 只作为本地迭代和阻塞排查手段，不替代 PushT full acceptance。
 
-## ALOHA Smoke 结果
+## Task 4：ALOHA Representative Smoke 全链路验证
 
-- 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/aloha_sim_transfer_cube_human --episode-index 0 --output-dir artifacts/stage4/final_aloha_smoke_episode_0000 --profile aloha --max-frames 60`
-- 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
-- stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
-- 因导入未完成，未生成 package，后续 validate/convert-rerun/`rerun rrd verify` 未运行。
+- 替换原因：原指定 `lerobot/aloha_sim_transfer_cube_human` 可导入 60 帧 state/action，但 metadata 仅暴露 `observation.images.top` 单相机视频字段；真实导入后 `image_refs_json={}`，不满足 ALOHA representative smoke 的多相机硬要求。
+- 替代 repo：`lerobot/aloha_static_towel`，公开 ALOHA-family 数据集，metadata 暴露 4 个视频相机字段：`observation.images.cam_high`、`observation.images.cam_left_wrist`、`observation.images.cam_low`、`observation.images.cam_right_wrist`。
+- 兼容修复：loader 针对真实 ALOHA metadata 视频字段新增聚焦支持；先用 fake fixture 复现“行数据无图像字段、metadata 有 video_keys”的失败，再用 PyAV 按 metadata 明确视频路径解码帧图像。不推断相机标定、双臂关节语义、成功/失败标签或隐藏 metadata。
+
+清理旧生成物：
+
+```bash
+rm -rf artifacts/stage4/aloha_representative_episode_0000 artifacts/stage4/aloha_representative_episode_0000.rrd
+```
+
+导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/aloha_static_towel \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/aloha_representative_episode_0000 \
+  --profile aloha \
+  --max-frames 60
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/aloha_representative_episode_0000`。
+- 包路径：`artifacts/stage4/aloha_representative_episode_0000`。
+- Rerun 路径：`artifacts/stage4/aloha_representative_episode_0000.rrd`。
+- repo id：`lerobot/aloha_static_towel`。
+- episode index：0。
+- max frames：60。
+- fps：50.0。
+- state/action 维度：14 / 14。
+- 多相机 refs：已观察到并写入 `image_refs_json`。
+- 相机：`cam_high`、`cam_left_wrist`、`cam_low`、`cam_right_wrist`。
+- 第一帧：`image_ref=artifacts/images/cam_high/frame_0000.png`；`image_refs_json` 包含 4 个相机到 `artifacts/images/<camera>/frame_0000.png` 的引用。
+- 图像 artifact 数：240（60 frames x 4 cameras）。
+
+测试与复跑：
+
+- `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py::test_loader_extracts_metadata_video_cameras_to_temporary_pngs -q`：先失败于 `episode.frames[0].images == {}`，修复后 `1 passed`。
+- `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_profiles.py -q`：`15 passed`。
+- `uv run python -m pytest -q`：`97 passed in 2.67s`。
+- 再次运行同一 ALOHA import：通过。
+
+validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/aloha_representative_episode_0000 --json
+```
+
+- 结果：`"ok": true`，`frame_count: 60`，`metric_count: 240`，`artifact_ref_count: 121`，无 errors/warnings。
+
+summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/aloha_representative_episode_0000 --json
+```
+
+- 结果：`scenario_type: open_robot_manipulation`，`frame_count: 60`，metrics 包含 `action_delta`、`action_norm`、`image_available`、`state_norm`。
+
+candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/aloha_representative_episode_0000
+```
+
+- 结果：通过，写出 `artifacts/stage4/aloha_representative_episode_0000/derived/candidates.csv`。
+
+Rerun 转换与校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/aloha_representative_episode_0000 \
+  --output-rrd artifacts/stage4/aloha_representative_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/aloha_representative_episode_0000.rrd
+```
+
+- 转换结果：通过，写出 `.rrd`。
+- `rerun rrd verify`：`1 file verified without error.`
+
+多相机检查输出：
+
+```text
+frame_count: 60
+cameras: ['cam_high', 'cam_left_wrist', 'cam_low', 'cam_right_wrist']
+first_image_ref: artifacts/images/cam_high/frame_0000.png
+first_image_refs_json: {'cam_high': 'artifacts/images/cam_high/frame_0000.png', 'cam_left_wrist': 'artifacts/images/cam_left_wrist/frame_0000.png', 'cam_low': 'artifacts/images/cam_low/frame_0000.png', 'cam_right_wrist': 'artifacts/images/cam_right_wrist/frame_0000.png'}
+```
 
 ## 风险限制
 
@@ -48,11 +418,10 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - Stage 4 不连接真实机器人硬件，不训练模型，不判断策略效果。
 - 通用 adapter 不推断源数据中没有明确给出的成功/失败、标定、机器人运动学、相机几何和任务质量。
 - ALOHA 多相机与复杂状态字段当前按保守方式保留，后续如需完整语义化，需要单独扩展 profile。
+- 当前自动化环境 native Rerun GUI 启动存在 wgpu surface 尺寸错误；Viewer/Blueprint 人工视觉验收仍需在 GUI 可用环境补做。
 
 ## 下一步
 
-1. 由主线程运行 PushT full acceptance，并把真实命令输出补入本文档。
-2. 如果 full acceptance 受阻，先运行 PushT quick smoke，记录阻塞原因和最小可用链路结果。
-3. 运行 ALOHA representative smoke，确认多相机 artifact 与 Rerun adapter 输出。
-4. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
-5. 基于真实 smoke 结果校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。
+1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Viewer/Blueprint 人工视觉验收，记录 PushT full、PushT quick 和 ALOHA representative 的时间线、实体树、事件和指标观察。
+2. 如后续需要展示多相机 Blueprint，基于 ALOHA representative `.rrd` 建立项目自定义 `.rbl` 或文档化布局保存步骤。
+3. 基于后续人工验收结果决定是否扩展 profile 字段、默认 blueprint 或 Viewer 启动脚本。

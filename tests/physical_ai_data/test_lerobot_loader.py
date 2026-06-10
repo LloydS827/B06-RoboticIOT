@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+import json
 import sys
 from types import ModuleType
 from pathlib import Path
@@ -102,6 +104,168 @@ def test_loader_falls_back_to_legacy_lerobot_path(monkeypatch: pytest.MonkeyPatc
     assert len(episode.frames) == 1
 
 
+def test_loader_falls_back_to_hf_dataset_when_lerobot_rejects_old_format(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise FakeBackwardCompatibilityError("dataset is in 2.1 format")
+
+    class FakeHFDataset:
+        features = {
+            "episode_index": {},
+            "frame_index": {},
+            "timestamp": {},
+            "observation.state": {},
+            "action": {},
+        }
+
+        def __iter__(self):
+            return iter(
+                [
+                    {
+                        "episode_index": 0,
+                        "frame_index": 0,
+                        "timestamp": 0.0,
+                        "observation.state": [1.0, 2.0],
+                        "action": [3.0, 4.0],
+                    }
+                ]
+            )
+
+    calls: list[dict[str, object]] = []
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        calls.append({"repo_id": repo_id, "split": split, "streaming": streaming})
+        return FakeHFDataset()
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    episode = load_lerobot_episode(repo_id="lerobot/old-format", episode_index=0, max_frames=1)
+
+    assert calls == [{"repo_id": "lerobot/old-format", "split": "train", "streaming": True}]
+    assert episode.features == FakeHFDataset.features
+    assert episode.frames == [
+        LeRobotFrame(
+            frame_index=0,
+            timestamp_s=0.0,
+            images={},
+            state=[1.0, 2.0],
+            action=[3.0, 4.0],
+        )
+    ]
+
+
+def test_loader_normalizes_hf_fallback_features_with_to_dict(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise FakeBackwardCompatibilityError("dataset is in 2.1 format")
+
+    class FakeFeature:
+        pass
+
+    class FakeFeatures(Mapping[str, object]):
+        _plain = {
+            "episode_index": {"dtype": "int64"},
+            "observation.state": {"dtype": "float32", "shape": [2]},
+            "action": {"dtype": "float32", "shape": [2]},
+        }
+
+        def __getitem__(self, key: str) -> object:
+            return FakeFeature()
+
+        def __iter__(self):
+            return iter(self._plain)
+
+        def __len__(self) -> int:
+            return len(self._plain)
+
+        def to_dict(self) -> dict[str, object]:
+            return self._plain
+
+    class FakeHFDataset:
+        features = FakeFeatures()
+
+        def __iter__(self):
+            return iter(
+                [
+                    {
+                        "episode_index": 0,
+                        "frame_index": 0,
+                        "observation.state": [1.0, 2.0],
+                        "action": [3.0, 4.0],
+                    }
+                ]
+            )
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        return FakeHFDataset()
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    episode = load_lerobot_episode(repo_id="lerobot/old-format", episode_index=0, max_frames=1)
+
+    assert episode.features == FakeFeatures._plain
+    json.dumps(dict(episode.features))
+
+
+def test_loader_reraises_non_backward_compatibility_lerobot_errors(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise RuntimeError("network is unavailable")
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        raise AssertionError("HF fallback should not run")
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    with pytest.raises(RuntimeError, match="network is unavailable"):
+        load_lerobot_episode(repo_id="lerobot/fake", episode_index=0, max_frames=1)
+
+
 def test_loader_converts_fake_hf_dataset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     calls: list[dict[str, object]] = []
 
@@ -176,6 +340,40 @@ def test_loader_converts_fake_hf_dataset(monkeypatch: pytest.MonkeyPatch, tmp_pa
             action=[0.3, 0.4],
         )
     ]
+
+
+def test_loader_normalizes_dataframe_like_task_metadata(monkeypatch: pytest.MonkeyPatch):
+    class FakeDataFrame:
+        def to_dict(self, orient: str = "dict") -> list[dict[str, object]]:
+            assert orient == "records"
+            return [{"task_index": 0, "task": "fake task"}]
+
+        def __eq__(self, other: object) -> object:
+            raise ValueError("truth value is ambiguous")
+
+    class FakeDataset:
+        meta = SimpleNamespace(tasks=FakeDataFrame())
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            self.hf_dataset = [
+                {
+                    "episode_index": 0,
+                    "frame_index": 0,
+                    "timestamp": 0.0,
+                    "observation.state": [1.0],
+                    "action": [2.0],
+                }
+            ]
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.common.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/fake", episode_index=0, max_frames=1)
+
+    assert episode.task_metadata == {"tasks": [{"task_index": 0, "task": "fake task"}]}
 
 
 def test_loader_falls_back_to_dataset_iterable(monkeypatch: pytest.MonkeyPatch):
@@ -276,3 +474,222 @@ def test_loader_writes_tensor_images_to_temporary_png(monkeypatch: pytest.Monkey
 
     assert image_path.suffix == ".png"
     assert image_path.exists()
+
+
+def test_loader_extracts_metadata_video_cameras_to_temporary_pngs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from PIL import Image
+
+    class FakeVideoFrame:
+        def __init__(self, color: tuple[int, int, int]) -> None:
+            self.color = color
+
+        def to_image(self) -> Image.Image:
+            return Image.new("RGB", (2, 2), self.color)
+
+    class FakeContainer:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def __enter__(self) -> FakeContainer:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            pass
+
+        def decode(self, video: int = 0):
+            assert video == 0
+            color = (255, 0, 0) if "cam_high" in self.path else (0, 255, 0)
+            yield FakeVideoFrame(color)
+            yield FakeVideoFrame(color)
+
+    def fake_av_open(path: str) -> FakeContainer:
+        return FakeContainer(path)
+
+    class FakeMeta:
+        fps = 50.0
+        root = tmp_path
+        video_keys = ["observation.images.cam_high", "observation.images.cam_left_wrist"]
+        features = {
+            "observation.images.cam_high": {"dtype": "video"},
+            "observation.images.cam_left_wrist": {"dtype": "video"},
+            "observation.state": {},
+            "action": {},
+        }
+
+        def get_video_file_path(self, ep_index: int, vid_key: str) -> Path:
+            assert ep_index == 0
+            return Path("videos") / vid_key / "chunk-000" / "file-000.mp4"
+
+    class FakeDataset:
+        meta = FakeMeta()
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            for video_key in self.meta.video_keys:
+                video_path = tmp_path / self.meta.get_video_file_path(0, video_key)
+                video_path.parent.mkdir(parents=True, exist_ok=True)
+                video_path.write_bytes(b"fake video")
+            self.hf_dataset = [
+                {
+                    "episode_index": 0,
+                    "frame_index": 0,
+                    "timestamp": 0.0,
+                    "observation.state": [],
+                    "action": [],
+                },
+                {
+                    "episode_index": 0,
+                    "frame_index": 1,
+                    "timestamp": 0.02,
+                    "observation.state": [],
+                    "action": [],
+                },
+            ]
+
+    fake_av_module = ModuleType("av")
+    fake_av_module.open = fake_av_open
+    monkeypatch.setitem(sys.modules, "av", fake_av_module)
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/aloha_static_towel", episode_index=0, max_frames=2)
+
+    assert sorted(episode.frames[0].images) == ["cam_high", "cam_left_wrist"]
+    assert sorted(episode.frames[1].images) == ["cam_high", "cam_left_wrist"]
+    assert all(path.suffix == ".png" and path.exists() for path in episode.frames[0].images.values())
+
+
+def test_loader_advances_metadata_video_sources_when_row_image_exists(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    row_image = tmp_path / "row_cam_high.png"
+    row_image.write_bytes(
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
+        b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
+        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01"
+        b"\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82"
+    )
+
+    class FakeVideoFrame:
+        def to_image(self):
+            from PIL import Image
+
+            return Image.new("RGB", (1, 1), (255, 0, 0))
+
+    class FakeContainer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            pass
+
+        def decode(self, video: int = 0):
+            assert video == 0
+            yield FakeVideoFrame()
+            yield FakeVideoFrame()
+
+    class FakeMeta:
+        fps = 50.0
+        root = tmp_path
+        video_keys = ["observation.images.cam_high"]
+        features = {"observation.images.cam_high": {"dtype": "video"}}
+
+        def get_video_file_path(self, ep_index: int, vid_key: str) -> Path:
+            assert ep_index == 0
+            return Path("videos") / vid_key / "chunk-000" / "file-000.mp4"
+
+    class FakeDataset:
+        meta = FakeMeta()
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            video_path = tmp_path / self.meta.get_video_file_path(0, self.meta.video_keys[0])
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_bytes(b"fake video")
+            self.hf_dataset = [
+                {
+                    "episode_index": 0,
+                    "frame_index": 0,
+                    "observation.images.cam_high": str(row_image),
+                },
+                {
+                    "episode_index": 0,
+                    "frame_index": 1,
+                },
+            ]
+
+    fake_av_module = ModuleType("av")
+    fake_av_module.open = lambda path: FakeContainer()
+    monkeypatch.setitem(sys.modules, "av", fake_av_module)
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/aloha_static_towel", episode_index=0, max_frames=2)
+
+    assert episode.frames[0].images["cam_high"] == row_image
+    assert episode.frames[1].images["cam_high"].name == "cam_high_0001.png"
+
+
+def test_loader_releases_metadata_video_temp_dirs_when_episode_closes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    class FakeVideoFrame:
+        def to_image(self):
+            from PIL import Image
+
+            return Image.new("RGB", (1, 1), (255, 0, 0))
+
+    class FakeContainer:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            pass
+
+        def decode(self, video: int = 0):
+            assert video == 0
+            yield FakeVideoFrame()
+
+    class FakeMeta:
+        fps = 50.0
+        root = tmp_path
+        video_keys = ["observation.images.cam_high"]
+        features = {"observation.images.cam_high": {"dtype": "video"}}
+
+        def get_video_file_path(self, ep_index: int, vid_key: str) -> Path:
+            assert ep_index == 0
+            return Path("videos") / vid_key / "chunk-000" / "file-000.mp4"
+
+    class FakeDataset:
+        meta = FakeMeta()
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            video_path = tmp_path / self.meta.get_video_file_path(0, self.meta.video_keys[0])
+            video_path.parent.mkdir(parents=True, exist_ok=True)
+            video_path.write_bytes(b"fake video")
+            self.hf_dataset = [{"episode_index": 0, "frame_index": 0}]
+
+    fake_av_module = ModuleType("av")
+    fake_av_module.open = lambda path: FakeContainer()
+    monkeypatch.setitem(sys.modules, "av", fake_av_module)
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/aloha_static_towel", episode_index=0, max_frames=1)
+    image_path = episode.frames[0].images["cam_high"]
+    temp_dir = image_path.parent
+
+    assert image_path.exists()
+    episode.close()
+    assert not temp_dir.exists()

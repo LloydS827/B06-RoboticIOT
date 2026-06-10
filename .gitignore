@@ -12,6 +12,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+.venv/
+*.egg-info/
 node_modules/
 dist/
 build/
@@ -20,6 +22,8 @@ build/
 .env
 .env.*
 !.env.example
+.worktrees
+.worktrees/
 
 # Stage 2 generated artifacts
 artifacts/

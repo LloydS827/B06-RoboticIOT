@@ -22,6 +22,11 @@ lerobot = [
   "lerobot>=0.3.0",
 ]
 
+[tool.uv]
+override-dependencies = [
+  "rerun-sdk[dataplatform]>=0.33.0",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 from typing import Any
@@ -28,6 +29,13 @@ def load_lerobot_episode(
     root_path = Path(root) if root is not None else None
     dataset = _open_dataset(LeRobotDataset, repo_id, root_path, episode_index)
     selected_profile = select_lerobot_profile(repo_id, profile)
+    temporary_directories: list[tempfile.TemporaryDirectory[str]] = []
+    video_image_sources = _metadata_video_image_sources(
+        dataset,
+        episode_index,
+        camera,
+        temporary_directories,
+    )
 
     frames: list[LeRobotFrame] = []
     first_row: Mapping[str, Any] | None = None
@@ -38,7 +46,12 @@ def load_lerobot_episode(
             continue
         if first_row is None:
             first_row = row
-        frames.append(_frame_from_row(row, len(frames), camera))
+        frame = _frame_from_row(row, len(frames), camera, temporary_directories)
+        if video_image_sources:
+            video_images = _next_video_images(video_image_sources, frame.images)
+            if video_images:
+                frame = replace(frame, images={**frame.images, **video_images})
+        frames.append(frame)
         if max_frames is not None and len(frames) >= max_frames:
             break
 
@@ -54,6 +67,7 @@ def load_lerobot_episode(
         episode_metadata=_episode_metadata(dataset, first_row, episode_index),
         task_metadata=_task_metadata(dataset, first_row),
         frames=frames,
+        temporary_directories=temporary_directories,
     )
 
 
@@ -76,12 +90,46 @@ def _lerobot_dataset_class() -> Any:
 
 def _open_dataset(dataset_class: Any, repo_id: str, root: Path | None, episode_index: int) -> Any:
     try:
+        return _open_lerobot_dataset(dataset_class, repo_id, root, episode_index)
+    except Exception as exc:
+        if _is_lerobot_backward_compatibility_error(exc):
+            return _open_hf_dataset(repo_id)
+        raise
+
+
+def _open_lerobot_dataset(dataset_class: Any, repo_id: str, root: Path | None, episode_index: int) -> Any:
+    try:
         return dataset_class(repo_id, root=root, episodes=[episode_index])
     except TypeError:
         try:
             return dataset_class(repo_id, root=root)
         except TypeError:
             return dataset_class(repo_id)
+
+
+def _is_lerobot_backward_compatibility_error(exc: Exception) -> bool:
+    try:
+        from lerobot.datasets.backward_compatibility import BackwardCompatibilityError
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(exc, BackwardCompatibilityError)
+
+
+def _open_hf_dataset(repo_id: str) -> Any:
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError(
+            "Install the datasets dependency to load legacy LeRobot dataset formats."
+        ) from exc
+    hf_dataset = load_dataset(repo_id, split="train", streaming=True)
+    return _HFDatasetFallback(hf_dataset)
+
+
+class _HFDatasetFallback:
+    def __init__(self, hf_dataset: Any) -> None:
+        self.hf_dataset = hf_dataset
+        self.features = _dict_value(getattr(hf_dataset, "features", None))
 
 
 def _dataset_rows(dataset: Any) -> Iterable[Any]:
@@ -101,17 +149,26 @@ def _matches_episode(row: Mapping[str, Any], episode_index: int) -> bool:
         return False
 
 
-def _frame_from_row(row: Mapping[str, Any], output_index: int, camera: str | None) -> LeRobotFrame:
+def _frame_from_row(
+    row: Mapping[str, Any],
+    output_index: int,
+    camera: str | None,
+    temporary_directories: list[tempfile.TemporaryDirectory[str]],
+) -> LeRobotFrame:
     return LeRobotFrame(
         frame_index=_int_value(_first_value(row, ("frame_index", "frame.idx", "index")), output_index),
         timestamp_s=_optional_float(_first_value(row, ("timestamp", "timestamp_s"))),
-        images=_image_refs(row, camera),
+        images=_image_refs(row, camera, temporary_directories),
         state=_float_list(_first_value(row, ("observation.state", "state"))),
         action=_float_list(_first_value(row, ("action",))),
     )
 
 
-def _image_refs(row: Mapping[str, Any], selected_camera: str | None) -> dict[str, Path]:
+def _image_refs(
+    row: Mapping[str, Any],
+    selected_camera: str | None,
+    temporary_directories: list[tempfile.TemporaryDirectory[str]],
+) -> dict[str, Path]:
     images: dict[str, Path] = {}
     for key, value in row.items():
         is_image_key = "image" in key.lower()
@@ -122,10 +179,89 @@ def _image_refs(row: Mapping[str, Any], selected_camera: str | None) -> dict[str
         if selected_camera is not None and camera != selected_camera:
             continue
         if path is None and is_image_key:
-            path = _temporary_image_path(value, camera)
+            path = _temporary_image_path(value, camera, temporary_directories)
         if path is None:
             continue
         images[camera] = path
+    return images
+
+
+def _metadata_video_image_sources(
+    dataset: Any,
+    episode_index: int,
+    selected_camera: str | None,
+    temporary_directories: list[tempfile.TemporaryDirectory[str]],
+) -> dict[str, Iterator[Path]]:
+    meta = getattr(dataset, "meta", None)
+    video_keys = _normalize(getattr(meta, "video_keys", None) if meta is not None else None)
+    if not isinstance(video_keys, list):
+        return {}
+    sources: dict[str, Iterator[Path]] = {}
+    for video_key in video_keys:
+        if not isinstance(video_key, str):
+            continue
+        camera = _camera_name(video_key, selected_camera)
+        if selected_camera is not None and camera != selected_camera:
+            continue
+        video_path = _metadata_video_path(dataset, episode_index, video_key)
+        if video_path is None:
+            continue
+        sources[camera] = _temporary_video_frame_paths(video_path, camera, temporary_directories)
+    return sources
+
+
+def _metadata_video_path(dataset: Any, episode_index: int, video_key: str) -> Path | None:
+    meta = getattr(dataset, "meta", None)
+    get_video_file_path = getattr(meta, "get_video_file_path", None) if meta is not None else None
+    if get_video_file_path is None:
+        return None
+    try:
+        relative_path = Path(get_video_file_path(episode_index, video_key))
+    except (TypeError, ValueError, KeyError, IndexError):
+        return None
+    if relative_path.is_absolute():
+        return relative_path
+    root = getattr(meta, "root", None) if meta is not None else None
+    if root is None:
+        root = getattr(dataset, "root", None)
+    if root is None:
+        return None
+    return Path(root) / relative_path
+
+
+def _temporary_video_frame_paths(
+    video_path: Path,
+    camera: str,
+    temporary_directories: list[tempfile.TemporaryDirectory[str]],
+) -> Iterator[Path]:
+    try:
+        import av
+    except ImportError:
+        return
+    if not video_path.exists():
+        return
+    temporary_directory = tempfile.TemporaryDirectory(prefix="physical_ai_lerobot_video_images_")
+    temporary_directories.append(temporary_directory)
+    output_dir = Path(temporary_directory.name)
+    with av.open(str(video_path)) as container:
+        for frame_index, video_frame in enumerate(container.decode(video=0)):
+            output_path = output_dir / f"{_safe_filename(camera)}_{frame_index:04d}.png"
+            video_frame.to_image().save(output_path)
+            yield output_path
+
+
+def _next_video_images(
+    sources: Mapping[str, Iterator[Path]],
+    existing_images: Mapping[str, Path],
+) -> dict[str, Path]:
+    images: dict[str, Path] = {}
+    for camera, source in sources.items():
+        try:
+            image_path = next(source)
+        except StopIteration:
+            continue
+        if camera not in existing_images:
+            images[camera] = image_path
     return images
 
 
@@ -153,11 +289,17 @@ def _looks_like_image_path(path: Path) -> bool:
     return path.suffix.lower() in {".png", ".jpg", ".jpeg", ".bmp", ".webp"}
 
 
-def _temporary_image_path(value: Any, camera: str) -> Path | None:
+def _temporary_image_path(
+    value: Any,
+    camera: str,
+    temporary_directories: list[tempfile.TemporaryDirectory[str]],
+) -> Path | None:
     image = _pil_image(value)
     if image is None:
         return None
-    output_dir = Path(tempfile.mkdtemp(prefix="physical_ai_lerobot_images_"))
+    temporary_directory = tempfile.TemporaryDirectory(prefix="physical_ai_lerobot_images_")
+    temporary_directories.append(temporary_directory)
+    output_dir = Path(temporary_directory.name)
     output_path = output_dir / f"{_safe_filename(camera)}.png"
     image.save(output_path)
     return output_path
@@ -346,6 +488,11 @@ def _normalize(value: Any) -> Any:
             pass
     if hasattr(value, "tolist"):
         return _normalize(value.tolist())
+    if hasattr(value, "to_dict"):
+        try:
+            return _normalize(value.to_dict(orient="records"))
+        except TypeError:
+            return _normalize(value.to_dict())
     if isinstance(value, Mapping):
         return {key: _normalize(item) for key, item in value.items()}
     if isinstance(value, tuple):

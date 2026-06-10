@@ -154,12 +154,15 @@ def _import_lerobot(args: argparse.Namespace) -> int:
         max_frames=args.max_frames,
         camera=args.camera,
     )
-    package = import_lerobot_episode(
-        episode,
-        args.output_dir,
-        max_frames=args.max_frames,
-        primary_camera=args.camera,
-    )
+    try:
+        package = import_lerobot_episode(
+            episode,
+            args.output_dir,
+            max_frames=args.max_frames,
+            primary_camera=args.camera,
+        )
+    finally:
+        episode.close()
     print(f"Imported LeRobot episode to Physical AI Package: {package}")
     return 0
 
