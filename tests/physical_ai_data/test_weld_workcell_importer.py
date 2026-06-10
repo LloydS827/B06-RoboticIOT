@@ -5,7 +5,11 @@ import csv
 import json
 from pathlib import Path
 
+from physical_ai_data.candidates import export_candidates, summarize_package
 from physical_ai_data.importers import ImportRequest, run_import
+from physical_ai_data.package_io import read_json
+from physical_ai_data.rerun_adapter import write_rrd
+from physical_ai_data.training_export import export_training_eval_draft
 from physical_ai_data.validation import validate_package
 from physical_ai_data.weld_workcell_importer import WeldWorkcellPackageImporter
 
@@ -153,7 +157,7 @@ def _write_weld_source(root: Path, *, include_review_labels: bool = True) -> Pat
     return root
 
 
-def test_weld_workcell_importer_creates_valid_robot_welding_package(tmp_path: Path):
+def test_weld_workcell_importer_maps_tables_and_source_dataset(tmp_path: Path):
     source = _write_weld_source(tmp_path / "source")
     request = ImportRequest(
         source_format="weld_workcell",
@@ -170,16 +174,33 @@ def test_weld_workcell_importer_creates_valid_robot_welding_package(tmp_path: Pa
     assert result.source_format == "weld_workcell"
     assert result.source_id == str(source)
     assert result.frame_count == 3
-    manifest = json.loads((package / "physical_ai_manifest.json").read_text(encoding="utf-8"))
+    manifest = read_json(package / "physical_ai_manifest.json")
     assert manifest["scenario_type"] == "robot_welding_station"
     assert manifest["package_id"] == "weld_workcell_WO-1001_station_A"
     assert manifest["task"]["name"] == "Root pass weld"
     assert manifest["source_dataset"]["format"] == "weld_workcell"
     assert manifest["source_dataset"]["image_copy_policy"] == "copied_to_artifacts_images_frame_id"
+    assert manifest["source_dataset"]["frame_count"] == 3
+    assert manifest["source_dataset"]["process_row_count"] == 1
+    assert manifest["source_dataset"]["event_count"] == 1
+    assert manifest["source_dataset"]["label_count"] == 1
+    assert manifest["source_dataset"]["review_labels_csv_ref"] == "artifacts/source/review_labels.csv"
+    assert [item["object_id"] for item in manifest["objects"]] == ["part_alpha", "seam_root"]
+    assert [item["frame_id"] for item in manifest["coordinate_frames"]] == [
+        "station",
+        "robot_base",
+        "tcp",
+        "camera_front",
+        "workpiece",
+    ]
     frame_rows = _rows(package / "frames.csv")
     assert [row["frame_id"] for row in frame_rows] == ["frame_0000", "frame_0001", "frame_0002"]
+    assert [row["timeline"] for row in frame_rows] == ["sim_time", "sim_time", "sim_time"]
+    assert [row["coordinate_frame_id"] for row in frame_rows] == ["tcp", "tcp", "tcp"]
     assert frame_rows[0]["image_ref"] == "artifacts/images/frame_0000.png"
+    assert frame_rows[0]["trajectory_ref"] == "artifacts/trajectories/tcp_path.csv"
     assert (package / "artifacts/images/frame_0000.png").is_file()
+    assert (package / "artifacts/images/frame_0000.png").read_bytes() == (source / "images/front_0000.png").read_bytes()
     trajectory_rows = _rows(package / "artifacts/trajectories/tcp_path.csv")
     assert list(trajectory_rows[0]) == ["frame_id", "timestamp_s", "x", "y", "z", "qx", "qy", "qz", "qw"]
     assert trajectory_rows[0] == {
@@ -193,11 +214,49 @@ def test_weld_workcell_importer_creates_valid_robot_welding_package(tmp_path: Pa
         "qz": "0.0",
         "qw": "1.0",
     }
+    assert trajectory_rows[1]["x"] == "0.15"
+    metric_rows = _rows(package / "metrics.csv")
+    assert [(row["metric_name"], row["unit"]) for row in metric_rows] == [
+        ("weld_current", "A"),
+        ("weld_voltage", "V"),
+        ("wire_feed", "m/min"),
+        ("gas_flow", "L/min"),
+        ("travel_speed", "mm/s"),
+        ("defect_probability", "ratio"),
+    ]
+    event_rows = _rows(package / "events.csv")
+    assert event_rows[0]["timestamp_s"] == "0.31"
+    assert event_rows[0]["related_frame_id"] == "frame_0002"
+    assert event_rows[0]["related_object_id"] == "seam_root"
+    label_rows = _rows(package / "labels.csv")
+    assert label_rows[0]["target_ref"] == "frame:frame_0001"
+    assert label_rows[0]["source"] == "weld_workcell_review"
     assert (package / "artifacts/source/job.json").is_file()
     assert (package / "artifacts/source/frames.csv").is_file()
     assert (package / "artifacts/source/process.csv").is_file()
     assert (package / "artifacts/source/events.csv").is_file()
     assert (package / "artifacts/source/review_labels.csv").is_file()
+
+
+def test_weld_workcell_importer_leaves_image_refs_empty_when_copy_images_false(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    request = ImportRequest(
+        source_format="weld_workcell",
+        source={"root": source},
+        output_dir=tmp_path / "package",
+        options={"copy_images": False},
+    )
+
+    run_import(WeldWorkcellPackageImporter(), request)
+
+    package = tmp_path / "package"
+    frame_rows = _rows(package / "frames.csv")
+    manifest = read_json(package / "physical_ai_manifest.json")
+    validation = validate_package(package)
+    assert validation.ok, validation.errors
+    assert [row["image_ref"] for row in frame_rows] == ["", "", ""]
+    assert manifest["source_dataset"]["image_copy_policy"] == "image_refs_empty_when_copy_images_false"
+    assert list((package / "artifacts/images").iterdir()) == []
 
 
 def test_weld_workcell_importer_omits_absent_review_labels_ref(tmp_path: Path):
@@ -214,6 +273,32 @@ def test_weld_workcell_importer_omits_absent_review_labels_ref(tmp_path: Path):
     package = tmp_path / "package"
     validation = validate_package(package)
     assert validation.ok, validation.errors
-    manifest = json.loads((package / "physical_ai_manifest.json").read_text(encoding="utf-8"))
+    manifest = read_json(package / "physical_ai_manifest.json")
+    assert _rows(package / "labels.csv") == []
+    assert manifest["source_dataset"]["label_count"] == 0
     assert "review_labels_csv_ref" not in manifest["source_dataset"]
     assert not (package / "artifacts/source/review_labels.csv").exists()
+
+
+def test_weld_workcell_importer_outputs_pipeline_compatible_package(tmp_path: Path):
+    source = _write_weld_source(tmp_path / "source")
+    request = ImportRequest(
+        source_format="weld_workcell",
+        source={"root": source},
+        output_dir=tmp_path / "package",
+        options={"copy_images": True},
+    )
+
+    run_import(WeldWorkcellPackageImporter(), request)
+
+    package = tmp_path / "package"
+    summary = summarize_package(package)
+    candidates = export_candidates(package)
+    draft = export_training_eval_draft(package, split="eval")
+    rrd = write_rrd(package, tmp_path / "weld_workcell.rrd")
+    training_eval_manifest = read_json(draft / "training_eval_manifest.json")
+    assert summary["package_id"] == "weld_workcell_WO-1001_station_A"
+    assert candidates.is_file()
+    assert training_eval_manifest["export_format"] == "physical-ai-training-eval-draft/v0.2"
+    assert rrd.exists()
+    assert rrd.stat().st_size > 0

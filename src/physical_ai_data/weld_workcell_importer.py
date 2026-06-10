@@ -425,13 +425,13 @@ def _read_csv_header(path: Path) -> set[str]:
 
 def _nearest_frame_id(frames: list[dict[str, object]], timestamp_s: float) -> str:
     nearest_id = ""
-    nearest_delta: float | None = None
-    for frame in frames:
+    nearest_key: tuple[float, int] | None = None
+    for index, frame in enumerate(frames):
         frame_timestamp = float(str(frame.get("timestamp_s", "")))
-        delta = abs(frame_timestamp - timestamp_s)
-        if nearest_delta is None or delta < nearest_delta:
+        key = (abs(frame_timestamp - timestamp_s), index)
+        if nearest_key is None or key < nearest_key:
             nearest_id = str(frame.get("frame_id", ""))
-            nearest_delta = delta
+            nearest_key = key
     return nearest_id
 
 
