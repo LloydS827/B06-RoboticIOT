@@ -79,20 +79,20 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
 - 下方 PushT/ALOHA 结果为 Stage 4.1 环境建立前的历史记录；本节已解除 LeRobot 可选依赖安装阻塞，但本任务不运行真实数据 import，因此真实 smoke 状态仍待后续任务更新。
 
-## PushT Full Acceptance 结果
+## 历史记录：PushT Full Acceptance 结果
 
 - 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/pusht --episode-index 0 --output-dir artifacts/stage4/final_pusht_episode_0000 --profile pusht`
 - 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
 - stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
 - 因导入未完成，未生成 package，后续 validate/summarize/export-candidates/convert-rerun/`rerun rrd verify` 未运行。
 
-## PushT Quick Smoke 结果
+## 历史记录：PushT Quick Smoke 结果
 
 - 本轮未运行 quick smoke。
 - 原因：full acceptance 的阻塞不是下载体积、网络或时间限制，而是本地缺少 `lerobot` 可选依赖；quick smoke 会在同一依赖检查处失败。
 - quick smoke 只作为本地迭代和阻塞排查手段，不替代 PushT full acceptance。
 
-## ALOHA Smoke 结果
+## 历史记录：ALOHA Smoke 结果
 
 - 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/aloha_sim_transfer_cube_human --episode-index 0 --output-dir artifacts/stage4/final_aloha_smoke_episode_0000 --profile aloha --max-frames 60`
 - 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
