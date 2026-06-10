@@ -83,13 +83,13 @@
 - Stage 4.1 已针对 LeRobot 0.4.4 的真实旧格式数据补 loader fallback：`lerobot/pusht` 可通过 Hugging Face streaming 读取 parquet 行，`lerobot/aloha_static_towel` 可按 metadata video keys 解码 4 路相机图像。
 - Stage 4.1 已跑通真实 `lerobot/pusht` quick smoke：120 frames import、validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 均通过。
 - Stage 4.1 已跑通真实 `lerobot/aloha_static_towel` representative smoke：60 frames、`cam_high`/`cam_left_wrist`/`cam_low`/`cam_right_wrist` 四路相机、`image_refs_json`、candidate export、Rerun `.rrd verify` 均通过。
+- Stage 4.1 已完成 `lerobot/pusht` full acceptance 尝试：不加 `--max-frames` 导入 161 frames，validate/summarize/export-candidates/convert-rerun 和 full/quick/ALOHA representative `.rrd verify` 均通过；native Rerun GUI 在当前自动化环境触发 wgpu surface 尺寸错误，Viewer/Blueprint 人工视觉验收未完成，仅保留 headless Viewer 截图和 `.rrd verify` 证据。
 
 ## 下一步计划
 
-1. 由主线程运行 Stage 4 PushT full acceptance，并补齐 validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 结果。
-2. 如果 full acceptance 受网络、数据体积或时间限制影响，记录精确原因，但不回退已通过的 PushT quick smoke 和 ALOHA representative smoke 证据。
-3. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
-4. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
+1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
+2. 如需要固定多相机展示体验，基于 ALOHA representative `.rrd` 补充项目自定义 Blueprint 或最小 Viewer 启动说明。
+3. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
 
 ## 维护约定
 

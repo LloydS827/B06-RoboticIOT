@@ -24,7 +24,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 
 ## Stage 4.1 uv 环境
 
-- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证；Task 4 已完成 ALOHA representative smoke 多相机验证。PushT full acceptance 仍待后续任务执行。
+- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证；Task 4 已完成 ALOHA representative smoke 多相机验证；Task 5 已完成 PushT full acceptance 尝试，命令链路通过。Viewer native GUI 人工视觉验收未完成，原因见下方 Task 5 记录。
 - 工作区检查：`git status --short` 初始输出为空，未发现需要保留的既有改动。
 - `uv` 可用性：
   - `command -v uv`：`/Users/lloyd/.local/bin/uv`
@@ -135,6 +135,118 @@ Likely causes:
 - 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
 - stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
 - 因导入未完成，未生成 package，后续 validate/summarize/export-candidates/convert-rerun/`rerun rrd verify` 未运行。
+
+## Task 5：PushT Full Acceptance 尝试与 Viewer/Blueprint 检查
+
+执行前资源状态：
+
+- `df -h .`：`/dev/disk3s5 460Gi 174Gi 248Gi 42% /System/Volumes/Data`
+- `du -sh artifacts`：`243M artifacts`
+- `git status --short --branch`：`## codex/stage4-1-lerobot-real-data-smoke`
+
+清理并重建 full acceptance 目标：
+
+```bash
+rm -rf artifacts/stage4/pusht_episode_0000 artifacts/stage4/pusht_episode_0000.rrd
+mkdir -p artifacts/stage4/pusht_episode_0000
+```
+
+导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/pusht \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/pusht_episode_0000 \
+  --profile pusht
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/pusht_episode_0000`。
+- 包路径：`artifacts/stage4/pusht_episode_0000`。
+- 包大小：`112K`。
+- Rerun 路径：`artifacts/stage4/pusht_episode_0000.rrd`。
+
+validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate --json artifacts/stage4/pusht_episode_0000
+```
+
+- 结果：`"ok": true`，无 errors/warnings。
+- 关键摘要：`frame_count: 161`，`event_count: 2`，`label_count: 1`，`metric_count: 644`，`artifact_ref_count: 162`。
+
+summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize --json artifacts/stage4/pusht_episode_0000
+```
+
+- 结果：`scenario_type: open_robot_manipulation`，`frame_count: 161`，`artifact_ref_count: 162`。
+- phase：`pushing`。
+- event types：`episode_start`、`episode_end`。
+- metric names：`action_delta`、`action_norm`、`image_available`、`state_norm`。
+
+candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_episode_0000
+wc -l artifacts/stage4/pusht_episode_0000/derived/candidates.csv
+```
+
+- 结果：通过，写出 `artifacts/stage4/pusht_episode_0000/derived/candidates.csv`。
+- `wc -l` 输出 `149`，扣除表头后候选数量为 148。
+
+Rerun 转换与 full `.rrd` 校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/pusht_episode_0000 \
+  --output-rrd artifacts/stage4/pusht_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/pusht_episode_0000.rrd
+```
+
+- 转换结果：通过，写出 `artifacts/stage4/pusht_episode_0000.rrd`。
+- `rerun rrd verify`：`1 file verified without error.`
+
+既有 quick PushT 与 ALOHA representative `.rrd` 复核：
+
+```bash
+uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/aloha_representative_episode_0000.rrd
+```
+
+- PushT quick：`1 file verified without error.`
+- ALOHA representative：`1 file verified without error.`
+
+Viewer/Blueprint 检查：
+
+- `DISPLAY` 与 `WAYLAND_DISPLAY` 均为空；当前为 macOS 自动化执行环境。
+- 仓库内未发现项目自定义 `.rbl` blueprint 文件；仅有 `docs/stage2/viewer_blueprint_checklist.md` 和依赖包内 blueprint 代码。
+- native GUI Viewer 截图探测命令：
+
+```bash
+uv run rerun artifacts/stage4/pusht_episode_0000.rrd \
+  --screenshot-to /tmp/pusht_full_viewer_check.png \
+  --window-size 1280x720
+```
+
+- 结果：失败，exit code `102`。stderr 关键错误为 `Wgpu validation error`，`Surface` 请求尺寸 `(20000, 1682)`，超过最大纹理尺寸 `16384`，随后 panic：`Failed to take store hub from the Viewer`。
+- headless Viewer 截图探测命令：
+
+```bash
+uv run rerun artifacts/stage4/pusht_episode_0000.rrd \
+  --headless \
+  --screenshot-to /tmp/pusht_full_viewer_check_headless.png \
+  --window-size 1280x720
+```
+
+- 结果：通过，exit code `0`，生成 `/tmp/pusht_full_viewer_check_headless.png`，文件大小约 `553K`。
+- 结论：本轮只能证明 `.rrd` 通过 Rerun verify，且可被 Viewer headless 渲染路径读取；未完成人工视觉验收。不能把 `rerun rrd verify` 或 headless 截图替代人工 Viewer/Blueprint 验收。后续需要在可稳定启动 native GUI 或 web viewer 的环境中检查时间线、实体树、指标曲线、事件显示和布局保存。
+
+执行后资源状态：
+
+- `du -sh artifacts`：`243M artifacts`
+- `git status --short`：无输出；full package、`.rrd`、cache 和本地环境未进入 git 跟踪。
 
 ## Task 3：PushT Quick Smoke 全链路验证
 
@@ -306,9 +418,10 @@ first_image_refs_json: {'cam_high': 'artifacts/images/cam_high/frame_0000.png', 
 - Stage 4 不连接真实机器人硬件，不训练模型，不判断策略效果。
 - 通用 adapter 不推断源数据中没有明确给出的成功/失败、标定、机器人运动学、相机几何和任务质量。
 - ALOHA 多相机与复杂状态字段当前按保守方式保留，后续如需完整语义化，需要单独扩展 profile。
+- 当前自动化环境 native Rerun GUI 启动存在 wgpu surface 尺寸错误；Viewer/Blueprint 人工视觉验收仍需在 GUI 可用环境补做。
 
 ## 下一步
 
-1. 由主线程运行 PushT full acceptance，并把真实命令输出补入本文档。
-2. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
-3. 基于后续 full acceptance 结果继续校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。
+1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Viewer/Blueprint 人工视觉验收，记录 PushT full、PushT quick 和 ALOHA representative 的时间线、实体树、事件和指标观察。
+2. 如后续需要展示多相机 Blueprint，基于 ALOHA representative `.rrd` 建立项目自定义 `.rbl` 或文档化布局保存步骤。
+3. 基于后续人工验收结果决定是否扩展 profile 字段、默认 blueprint 或 Viewer 启动脚本。

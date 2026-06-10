@@ -30,12 +30,14 @@ Task 2 使用 `uv run python` 直接调用 `load_lerobot_episode`，只加载 ep
 | repo | profile | max frames | 实际 frames | fps | row/features 字段 | state/action 维度 | 图像相机 |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
 | `lerobot/pusht` | `pusht` | 3 | 3 | 30.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `next.reward`, `next.success`, `observation.state`, `task_index`, `timestamp` | 2 / 2 | 无 |
+| `lerobot/pusht` | `pusht` | 不限制 | 161 | 30.0 | 同上；Task 5 full acceptance 观察到末帧 `frame_0160` / `source_frame_index=160` / `timestamp_s=16.0` | 2 / 2 | 无，`image_ref` 为空且 `image_refs_json={}` |
 | `lerobot/aloha_sim_transfer_cube_human` | `aloha` | 2 | 2 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | 14 / 14 | metadata 仅暴露 `top` 单相机视频，预检 frame 中无已解码图像引用 |
 | `lerobot/aloha_static_towel` | `aloha` | 60 | 60 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.effort`, `observation.images.cam_high`, `observation.images.cam_left_wrist`, `observation.images.cam_low`, `observation.images.cam_right_wrist`, `observation.state`, `task_index`, `timestamp` | 14 / 14 | `cam_high`, `cam_left_wrist`, `cam_low`, `cam_right_wrist` |
 
 与 fake fixture 的差异：
 
 - `lerobot/pusht` 在 LeRobot 0.4.4 下被识别为 2.1 格式，`LeRobotDataset` 默认以 v3.0 codebase 打开时会抛 `BackwardCompatibilityError`；loader 仅在该明确旧格式错误下 fallback 到 Hugging Face `datasets.load_dataset(..., split="train", streaming=True)` 读取 parquet 行。
+- `lerobot/pusht` full acceptance 不加 `--max-frames` 时导入 161 帧，字段形态与 quick smoke 一致：无图像相机、state/action 维度为 2 / 2、`image_available` 为 0，未发现需要新增 PushT 专用字段。
 - `lerobot/aloha_sim_transfer_cube_human` 可通过 `LeRobotDataset` 打开 metadata/parquet，但 `meta.tasks` 等 metadata 可能是 pandas DataFrame，需要先归一化为普通 `list[dict]`/`dict` 后保存。
 - `lerobot/aloha_sim_transfer_cube_human` 的 `features`/`stats` 暴露 `observation.images.top`，但这是单相机视频字段，不满足 ALOHA representative smoke 的多相机要求。
 - `lerobot/aloha_static_towel` 的 `hf_dataset` 行同样不直接返回图像字段，但 metadata 暴露 4 个 video camera keys；loader 仅按 metadata 明确给出的 `video_keys` 和视频文件路径解码图像帧，不推断额外相机或伪造 refs。
