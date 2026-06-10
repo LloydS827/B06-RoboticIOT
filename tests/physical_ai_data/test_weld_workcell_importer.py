@@ -184,6 +184,10 @@ def test_weld_workcell_importer_maps_tables_and_source_dataset(tmp_path: Path):
     assert manifest["source_dataset"]["process_row_count"] == 1
     assert manifest["source_dataset"]["event_count"] == 1
     assert manifest["source_dataset"]["label_count"] == 1
+    assert manifest["source_dataset"]["job_json_ref"] == "artifacts/source/job.json"
+    assert manifest["source_dataset"]["frames_csv_ref"] == "artifacts/source/frames.csv"
+    assert manifest["source_dataset"]["process_csv_ref"] == "artifacts/source/process.csv"
+    assert manifest["source_dataset"]["events_csv_ref"] == "artifacts/source/events.csv"
     assert manifest["source_dataset"]["review_labels_csv_ref"] == "artifacts/source/review_labels.csv"
     assert [item["object_id"] for item in manifest["objects"]] == ["part_alpha", "seam_root"]
     assert [item["frame_id"] for item in manifest["coordinate_frames"]] == [
