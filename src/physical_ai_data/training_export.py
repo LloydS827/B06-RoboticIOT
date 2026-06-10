@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import csv
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping
 
 from physical_ai_data.candidates import export_candidates
 from physical_ai_data.package_io import read_csv_rows, read_json, write_csv_rows, write_json
-from physical_ai_data.schema import ValidationMessage
+from physical_ai_data.schema import CANDIDATE_COLUMNS, ValidationMessage
 from physical_ai_data.validation import MANIFEST_FILENAME, validate_package
 
 TRAINING_EVAL_EXPORT_FORMAT = "physical-ai-training-eval-draft/v0.1"
@@ -39,6 +40,7 @@ def export_training_eval_draft(
     if not candidates_csv.exists():
         candidates_csv = export_candidates(root)
 
+    _validate_candidate_columns(candidates_csv)
     candidates = read_csv_rows(candidates_csv)
     output = Path(output_dir) if output_dir is not None else root / "derived" / "training_eval"
     samples = [_sample_row(index, split, candidate, root) for index, candidate in enumerate(candidates)]
@@ -74,6 +76,14 @@ def _manifest(package_manifest: Mapping[str, object], root: Path, split: str, ca
         "candidate_count": candidate_count,
         "created_at": datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
     }
+
+
+def _validate_candidate_columns(candidates_csv: Path) -> None:
+    with candidates_csv.open(newline="", encoding="utf-8") as file:
+        columns = csv.DictReader(file).fieldnames or []
+    missing = [column for column in CANDIDATE_COLUMNS if column not in columns]
+    if missing:
+        raise ValueError(f"Candidate CSV missing required columns: {', '.join(missing)}")
 
 
 def _format_validation_errors(errors: list[ValidationMessage]) -> str:

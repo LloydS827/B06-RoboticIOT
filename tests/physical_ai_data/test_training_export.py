@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from physical_ai_data.samples import generate_welding_package
+from physical_ai_data.schema import CANDIDATE_COLUMNS
 from physical_ai_data.training_export import (
     TRAINING_EVAL_EXPORT_FORMAT,
     TRAINING_EVAL_SAMPLE_COLUMNS,
@@ -18,6 +19,14 @@ from physical_ai_data.training_export import (
 def _rows(path: Path) -> list[dict[str, str]]:
     with path.open(newline="", encoding="utf-8") as file:
         return list(csv.DictReader(file))
+
+
+def _write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
 
 def test_export_training_eval_draft_creates_default_manifest_and_samples(tmp_path: Path):
@@ -58,6 +67,58 @@ def test_export_training_eval_draft_generates_default_candidates_when_missing(tm
     export_training_eval_draft(package)
 
     assert candidates_csv.exists()
+
+
+def test_export_training_eval_draft_reuses_existing_valid_candidates(tmp_path: Path):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=8)
+    _write_rows(
+        package / "derived" / "candidates.csv",
+        CANDIDATE_COLUMNS,
+        [
+            {
+                "candidate_id": "candidate_manual",
+                "source_type": "event",
+                "source_id": "event_manual",
+                "frame_id": "frame_0000",
+                "object_id": "",
+                "timestamp_s": "0.0",
+                "reasons": "precomputed",
+                "score": "0.42",
+            }
+        ],
+    )
+
+    output = export_training_eval_draft(package)
+
+    rows = _rows(output / "samples.csv")
+    assert len(rows) == 1
+    assert rows[0]["candidate_id"] == "candidate_manual"
+    assert rows[0]["source_type"] == "event"
+    assert rows[0]["score"] == "0.42"
+
+
+def test_export_training_eval_draft_rejects_existing_candidates_missing_required_columns(tmp_path: Path):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=9)
+    columns = [column for column in CANDIDATE_COLUMNS if column not in {"score", "source_type"}]
+    _write_rows(
+        package / "derived" / "candidates.csv",
+        columns,
+        [
+            {
+                "candidate_id": "candidate_old",
+                "source_id": "event_old",
+                "frame_id": "frame_0000",
+                "object_id": "",
+                "timestamp_s": "0.0",
+                "reasons": "old format",
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        export_training_eval_draft(package)
+    assert "score" in str(exc_info.value)
+    assert "source_type" in str(exc_info.value)
 
 
 def test_export_training_eval_draft_uses_custom_output_dir(tmp_path: Path):
