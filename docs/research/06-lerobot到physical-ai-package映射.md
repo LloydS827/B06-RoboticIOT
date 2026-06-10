@@ -22,6 +22,22 @@
 | episode metadata | 保存为 `artifacts/source/lerobot_episode_metadata.json`。 |
 | task metadata | 保存为 `artifacts/source/lerobot_task_metadata.json`。 |
 
+## 真实预检观察字段
+
+Task 2 使用 `uv run python` 直接调用 `load_lerobot_episode`，只加载 episode 0 的少量 frame。观察结果如下：
+
+| repo | profile | max frames | 实际 frames | fps | row/features 字段 | state/action 维度 | 图像相机 |
+| --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| `lerobot/pusht` | `pusht` | 3 | 3 | 30.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `next.reward`, `next.success`, `observation.state`, `task_index`, `timestamp` | 2 / 2 | 无 |
+| `lerobot/aloha_sim_transfer_cube_human` | `aloha` | 2 | 2 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | 14 / 14 | 预检 frame 中无已解码图像引用 |
+
+与 fake fixture 的差异：
+
+- `lerobot/pusht` 在 LeRobot 0.4.4 下被识别为 2.1 格式，`LeRobotDataset` 默认以 v3.0 codebase 打开时会抛 `BackwardCompatibilityError`；loader 仅在该明确旧格式错误下 fallback 到 Hugging Face `datasets.load_dataset(..., split="train", streaming=True)` 读取 parquet 行。
+- `lerobot/aloha_sim_transfer_cube_human` 可通过 `LeRobotDataset` 打开 metadata/parquet，但 `meta.tasks` 等 metadata 可能是 pandas DataFrame，需要先归一化为普通 `list[dict]`/`dict` 后保存。
+- ALOHA 的 `features`/`stats` 暴露 `observation.images.top`，但当前小帧预检通过 `hf_dataset` 行读取时没有得到已解码图像值；直接走 `LeRobotDataset.__getitem__` 会进入 TorchCodec 视频解码路径，本轮不把视频解码失败转换为相机推断或伪图像引用。
+- 真实行使用 `task_index`，预检首行没有直接 `task` 字符串，因此 `task_name` 为空；adapter 仍只在源数据明确给出 `task` 时写任务名，不从 `task_index` 猜测语义。
+
 ## Manifest 映射
 
 Physical AI Package manifest 采用 `open_robot_manipulation` 场景类型，并在 `source_dataset` 中保留 LeRobot 血缘：

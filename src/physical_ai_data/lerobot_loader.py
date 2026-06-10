@@ -76,12 +76,46 @@ def _lerobot_dataset_class() -> Any:
 
 def _open_dataset(dataset_class: Any, repo_id: str, root: Path | None, episode_index: int) -> Any:
     try:
+        return _open_lerobot_dataset(dataset_class, repo_id, root, episode_index)
+    except Exception as exc:
+        if _is_lerobot_backward_compatibility_error(exc):
+            return _open_hf_dataset(repo_id)
+        raise
+
+
+def _open_lerobot_dataset(dataset_class: Any, repo_id: str, root: Path | None, episode_index: int) -> Any:
+    try:
         return dataset_class(repo_id, root=root, episodes=[episode_index])
     except TypeError:
         try:
             return dataset_class(repo_id, root=root)
         except TypeError:
             return dataset_class(repo_id)
+
+
+def _is_lerobot_backward_compatibility_error(exc: Exception) -> bool:
+    try:
+        from lerobot.datasets.backward_compatibility import BackwardCompatibilityError
+    except (ImportError, AttributeError):
+        return False
+    return isinstance(exc, BackwardCompatibilityError)
+
+
+def _open_hf_dataset(repo_id: str) -> Any:
+    try:
+        from datasets import load_dataset
+    except ImportError as exc:
+        raise RuntimeError(
+            "Install the datasets dependency to load legacy LeRobot dataset formats."
+        ) from exc
+    hf_dataset = load_dataset(repo_id, split="train", streaming=True)
+    return _HFDatasetFallback(hf_dataset)
+
+
+class _HFDatasetFallback:
+    def __init__(self, hf_dataset: Any) -> None:
+        self.hf_dataset = hf_dataset
+        self.features = _dict_value(getattr(hf_dataset, "features", None))
 
 
 def _dataset_rows(dataset: Any) -> Iterable[Any]:
@@ -348,6 +382,11 @@ def _normalize(value: Any) -> Any:
         return _normalize(value.tolist())
     if isinstance(value, Mapping):
         return {key: _normalize(item) for key, item in value.items()}
+    if hasattr(value, "to_dict"):
+        try:
+            return _normalize(value.to_dict(orient="records"))
+        except TypeError:
+            return _normalize(value.to_dict())
     if isinstance(value, tuple):
         return [_normalize(item) for item in value]
     if isinstance(value, list):

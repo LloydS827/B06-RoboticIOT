@@ -102,6 +102,71 @@ def test_loader_falls_back_to_legacy_lerobot_path(monkeypatch: pytest.MonkeyPatc
     assert len(episode.frames) == 1
 
 
+def test_loader_falls_back_to_hf_dataset_when_lerobot_rejects_old_format(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise FakeBackwardCompatibilityError("dataset is in 2.1 format")
+
+    class FakeHFDataset:
+        features = {
+            "episode_index": {},
+            "frame_index": {},
+            "timestamp": {},
+            "observation.state": {},
+            "action": {},
+        }
+
+        def __iter__(self):
+            return iter(
+                [
+                    {
+                        "episode_index": 0,
+                        "frame_index": 0,
+                        "timestamp": 0.0,
+                        "observation.state": [1.0, 2.0],
+                        "action": [3.0, 4.0],
+                    }
+                ]
+            )
+
+    calls: list[dict[str, object]] = []
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        calls.append({"repo_id": repo_id, "split": split, "streaming": streaming})
+        return FakeHFDataset()
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    episode = load_lerobot_episode(repo_id="lerobot/old-format", episode_index=0, max_frames=1)
+
+    assert calls == [{"repo_id": "lerobot/old-format", "split": "train", "streaming": True}]
+    assert episode.features == FakeHFDataset.features
+    assert episode.frames == [
+        LeRobotFrame(
+            frame_index=0,
+            timestamp_s=0.0,
+            images={},
+            state=[1.0, 2.0],
+            action=[3.0, 4.0],
+        )
+    ]
+
+
 def test_loader_converts_fake_hf_dataset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     calls: list[dict[str, object]] = []
 
@@ -176,6 +241,40 @@ def test_loader_converts_fake_hf_dataset(monkeypatch: pytest.MonkeyPatch, tmp_pa
             action=[0.3, 0.4],
         )
     ]
+
+
+def test_loader_normalizes_dataframe_like_task_metadata(monkeypatch: pytest.MonkeyPatch):
+    class FakeDataFrame:
+        def to_dict(self, orient: str = "dict") -> list[dict[str, object]]:
+            assert orient == "records"
+            return [{"task_index": 0, "task": "fake task"}]
+
+        def __eq__(self, other: object) -> object:
+            raise ValueError("truth value is ambiguous")
+
+    class FakeDataset:
+        meta = SimpleNamespace(tasks=FakeDataFrame())
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            self.hf_dataset = [
+                {
+                    "episode_index": 0,
+                    "frame_index": 0,
+                    "timestamp": 0.0,
+                    "observation.state": [1.0],
+                    "action": [2.0],
+                }
+            ]
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.common.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/fake", episode_index=0, max_frames=1)
+
+    assert episode.task_metadata == {"tasks": [{"task_index": 0, "task": "fake task"}]}
 
 
 def test_loader_falls_back_to_dataset_iterable(monkeypatch: pytest.MonkeyPatch):

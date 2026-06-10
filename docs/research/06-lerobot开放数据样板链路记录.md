@@ -79,6 +79,52 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
 - 下方 PushT/ALOHA 结果为 Stage 4.1 环境建立前的历史记录；本节已解除 LeRobot 可选依赖安装阻塞，但本任务不运行真实数据 import，因此真实 smoke 状态仍待后续任务更新。
 
+## Task 2 真实 Loader Preflight
+
+- 命令：`uv run python - <<'PY' ... load_lerobot_episode(...) ... PY`，分别加载：
+  - `repo_id="lerobot/pusht"`，`episode_index=0`，`profile="pusht"`，`max_frames=3`
+  - `repo_id="lerobot/aloha_sim_transfer_cube_human"`，`episode_index=0`，`profile="aloha"`，`max_frames=2`
+- 初始结果：PushT 在 `LeRobotDataset` 初始化阶段失败，错误为：
+
+```text
+lerobot.datasets.backward_compatibility.BackwardCompatibilityError:
+The dataset you requested (lerobot/pusht) is in 2.1 format.
+
+We introduced a new format since v3.0 which is not backward compatible with v2.1.
+```
+
+- 修复：`lerobot_loader.py` 仅在捕获 LeRobot `BackwardCompatibilityError` 时 fallback 到 `datasets.load_dataset(repo_id, split="train", streaming=True)` 读取旧格式 parquet 行；保留原有 `LeRobotDataset` 当前/legacy import path 和 constructor fallback。
+- 第二次预检中 ALOHA 能读取 frame，但在 task metadata 归一化处失败：
+
+```text
+ValueError: The truth value of a DataFrame is ambiguous. Use a.empty, a.bool(), a.item(), a.any() or a.all().
+```
+
+- 修复：`lerobot_loader.py` 的 `_normalize` 支持 DataFrame-like `to_dict(orient="records")`，把 `meta.tasks` 等 metadata 转为普通 Python 数据再保存，不推断任务语义。
+- 修复后的最终 preflight 输出摘要：
+
+| repo | episode | max frames | frame count | fps | features keys | stats keys | camera names | state/action dims |
+| --- | ---: | ---: | ---: | ---: | --- | --- | --- | --- |
+| `lerobot/pusht` | 0 | 3 | 3 | 30.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `next.reward`, `next.success`, `observation.state`, `task_index`, `timestamp` | 无 | 无 | 2 / 2 |
+| `lerobot/aloha_sim_transfer_cube_human` | 0 | 2 | 2 | 50.0 | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | `action`, `episode_index`, `frame_index`, `index`, `next.done`, `observation.images.top`, `observation.state`, `task_index`, `timestamp` | 预检 frame 未返回已解码图像引用 | 14 / 14 |
+
+- 图像限制：ALOHA metadata 暴露 `observation.images.top`，但当前 loader preflight 通过 `hf_dataset` 行读取到的是非图像核心字段；直接调用 `LeRobotDataset.__getitem__` 会进入 TorchCodec 视频解码路径，并在本机失败：
+
+```text
+RuntimeError: Could not load libtorchcodec.
+Likely causes:
+1. FFmpeg is not properly installed in your environment.
+2. The PyTorch version (2.10.0) is not compatible with this version of TorchCodec.
+```
+
+- 本任务不修复 TorchCodec/FFmpeg 环境问题，也不伪造图像相机；记录为后续真实视频帧 smoke 的环境关注项。
+- 测试结果：
+  - 新增旧格式 fallback fake fixture：先失败于 `FakeBackwardCompatibilityError: dataset is in 2.1 format`，修复后通过。
+  - 新增 DataFrame-like task metadata fake fixture：先失败于 `ValueError: truth value is ambiguous`，修复后通过。
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py -q`：`9 passed in 0.10s`
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_adapter.py -q`：`18 passed in 0.12s`
+  - `uv run python -m pytest -q`：`94 passed in 2.92s`
+
 ## 历史记录：PushT Full Acceptance 结果
 
 - 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/pusht --episode-index 0 --output-dir artifacts/stage4/final_pusht_episode_0000 --profile pusht`
