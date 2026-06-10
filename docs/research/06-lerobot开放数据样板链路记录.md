@@ -121,9 +121,12 @@ Likely causes:
 - 测试结果：
   - 新增旧格式 fallback fake fixture：先失败于 `FakeBackwardCompatibilityError: dataset is in 2.1 format`，修复后通过。
   - 新增 DataFrame-like task metadata fake fixture：先失败于 `ValueError: truth value is ambiguous`，修复后通过。
-  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py -q`：`9 passed in 0.10s`
-  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_adapter.py -q`：`18 passed in 0.12s`
-  - `uv run python -m pytest -q`：`94 passed in 2.92s`
+  - 新增 HF fallback feature serialization fake fixture：先失败于 `FakeFeature` 不可 JSON 序列化，修复后 `json.dumps(dict(episode.features))` 通过。
+  - 新增非 `BackwardCompatibilityError` re-raise fake fixture：确认普通构造错误不会被 HF fallback 吞掉。
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py -q`：通过。
+  - `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_adapter.py -q`：`20 passed in 0.13s`
+  - `uv run python -m pytest -q`：`96 passed in 2.50s`
+  - 最小真实 PushT 检查：`lerobot/pusht`、`max_frames=1` 可加载 1 帧，`json.dumps(dict(episode.features))` 成功。
 
 ## 历史记录：PushT Full Acceptance 结果
 
