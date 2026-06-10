@@ -8,6 +8,14 @@ from physical_ai_data.schema import ValidationResult
 from physical_ai_data.training_export import export_training_eval_draft as _export_training_eval_draft
 from physical_ai_data.validation import validate_package
 
+__all__ = [
+    "validate",
+    "summarize",
+    "export_candidates_csv",
+    "convert_to_rerun",
+    "export_training_eval_draft",
+]
+
 
 def validate(package_root: str | Path) -> ValidationResult:
     return validate_package(package_root)
@@ -23,7 +31,7 @@ def export_candidates_csv(
     *,
     min_score: float = 0.5,
 ) -> Path:
-    return export_candidates(package_root, output_csv, min_score=min_score)
+    return export_candidates(package_root, output_csv=output_csv, min_score=min_score)
 
 
 def convert_to_rerun(package_root: str | Path, output_rrd: str | Path) -> Path:
@@ -36,4 +44,4 @@ def export_training_eval_draft(
     *,
     split: str = "unspecified",
 ) -> Path:
-    return _export_training_eval_draft(package_root, output_dir, split=split)
+    return _export_training_eval_draft(package_root, output_dir=output_dir, split=split)
