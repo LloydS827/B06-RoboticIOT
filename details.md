@@ -75,19 +75,21 @@
 - Stage 4 已形成 Rerun 多相机引用支持：`frames.csv` 保留主 `image_ref`，扩展列 `image_refs_json` 记录同一 frame 的全部相机 artifact。
 - 新增 Stage 4 运行说明：`docs/stage4/README.md`。
 - 新增 LeRobot 到 Physical AI Package 映射文档：`docs/research/06-lerobot到physical-ai-package映射.md`。
-- 新增 LeRobot 开放数据样板链路记录：`docs/research/06-lerobot开放数据样板链路记录.md`；本轮已记录 `pytest` 与 CLI help 通过，真实 PushT/ALOHA smoke 因本地未安装 LeRobot 可选依赖而阻塞，未提前声称通过。
+- 新增 LeRobot 开放数据样板链路记录：`docs/research/06-lerobot开放数据样板链路记录.md`；历史记录保留了环境建立前的依赖阻塞，Stage 4.1 已更新为真实 PushT quick smoke 和 ALOHA representative smoke 通过。
 - Stage 4.1 已建立真实 LeRobot smoke 的独立 `uv` 环境：新增 `tool.uv.override-dependencies`，使 LeRobot dataset loader 与项目 `rerun-sdk[dataplatform]>=0.33.0` baseline 共存；该设置不降低 Rerun baseline，也不把 LeRobot 变成默认依赖。
 - Stage 4.1 已生成 `uv.lock`，`uv sync --extra dev --extra lerobot` 通过；当前环境版本为 Python 3.13.5、`lerobot==0.4.4`、`rerun-sdk==0.33.0`，并确认 `lerobot.datasets.lerobot_dataset.LeRobotDataset` 可导入。
 - Stage 4.1 已完成 Hugging Face metadata 探测：`lerobot/pusht` 与 `lerobot/aloha_sim_transfer_cube_human` 均可访问；`uv run python -m pytest -q` 返回 `92 passed`。
 - Stage 4.1 默认非 LeRobot 路径未改为依赖 LeRobot；本机系统 Python 缺少 `pip`/`pytest`，因此补充使用 `/tmp/stage4_1_default_dev_venv` 只安装 `.[dev]` 验证，测试返回 `92 passed` 且 `lerobot_installed=False`。
+- Stage 4.1 已针对 LeRobot 0.4.4 的真实旧格式数据补 loader fallback：`lerobot/pusht` 可通过 Hugging Face streaming 读取 parquet 行，`lerobot/aloha_static_towel` 可按 metadata video keys 解码 4 路相机图像。
+- Stage 4.1 已跑通真实 `lerobot/pusht` quick smoke：120 frames import、validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 均通过。
+- Stage 4.1 已跑通真实 `lerobot/aloha_static_towel` representative smoke：60 frames、`cam_high`/`cam_left_wrist`/`cam_low`/`cam_right_wrist` 四路相机、`image_refs_json`、candidate export、Rerun `.rrd verify` 均通过。
 
 ## 下一步计划
 
 1. 由主线程运行 Stage 4 PushT full acceptance，并补齐 validate、summarize、export-candidates、convert-rerun 和 `rerun rrd verify` 结果。
-2. 如果 full acceptance 受网络、数据体积或时间限制影响，先运行 PushT quick smoke 并记录阻塞原因。
-3. 运行 ALOHA representative smoke，校准多相机 artifact、`image_refs_json` 和 Rerun adapter 输出。
-4. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
-5. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
+2. 如果 full acceptance 受网络、数据体积或时间限制影响，记录精确原因，但不回退已通过的 PushT quick smoke 和 ALOHA representative smoke 证据。
+3. 补充 Viewer/Blueprint 人工检查，记录 GUI 观察、截图、布局保存和显示异常。
+4. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
 
 ## 维护约定
 
