@@ -23,9 +23,9 @@
 | episode metadata | 保存为 `artifacts/source/lerobot_episode_metadata.json`。 |
 | task metadata | 保存为 `artifacts/source/lerobot_task_metadata.json`。 |
 
-## 真实预检观察字段
+## 真实数据观察字段
 
-Task 2 使用 `uv run python` 直接调用 `load_lerobot_episode`，只加载 episode 0 的少量 frame。观察结果如下：
+下表汇总 Stage 4.1 的真实数据观察：Task 2 使用 `load_lerobot_episode` 做少量 frame 预检，Task 4 记录 ALOHA representative smoke，Task 5 记录 PushT full acceptance。观察结果如下：
 
 | repo | profile | max frames | 实际 frames | fps | row/features 字段 | state/action 维度 | 图像相机 |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |

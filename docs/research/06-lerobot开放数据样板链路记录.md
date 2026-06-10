@@ -78,7 +78,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
   - `du -sh .venv`：`1.6G`
   - `df -h .`：`/dev/disk3s5 460Gi 171Gi 251Gi 41% /System/Volumes/Data`
 - 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
-- 下方 PushT full acceptance 与 ALOHA 结果为 Stage 4.1 环境建立前的历史记录；PushT quick smoke 已由 Task 3 更新为真实全链路结果。
+- 本文保留 Stage 4.1 环境建立前的历史阻塞记录，并在后续 Task 3、Task 4、Task 5 小节记录真实全链路结果；同名“历史记录”小节不代表当前验收状态。
 
 ## Task 2 真实 Loader Preflight
 
@@ -332,7 +332,7 @@ uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
 清理旧生成物：
 
 ```bash
-rm -rf artifacts/stage4/aloha_smoke_episode_0000 artifacts/stage4/aloha_smoke_episode_0000.rrd
+rm -rf artifacts/stage4/aloha_representative_episode_0000 artifacts/stage4/aloha_representative_episode_0000.rrd
 ```
 
 导入命令：
@@ -341,14 +341,14 @@ rm -rf artifacts/stage4/aloha_smoke_episode_0000 artifacts/stage4/aloha_smoke_ep
 uv run python scripts/physical_ai_package.py import-lerobot \
   --repo-id lerobot/aloha_static_towel \
   --episode-index 0 \
-  --output-dir artifacts/stage4/aloha_smoke_episode_0000 \
+  --output-dir artifacts/stage4/aloha_representative_episode_0000 \
   --profile aloha \
   --max-frames 60
 ```
 
-- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/aloha_smoke_episode_0000`。
-- 包路径：`artifacts/stage4/aloha_smoke_episode_0000`。
-- Rerun 路径：`artifacts/stage4/aloha_smoke_episode_0000.rrd`。
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/aloha_representative_episode_0000`。
+- 包路径：`artifacts/stage4/aloha_representative_episode_0000`。
+- Rerun 路径：`artifacts/stage4/aloha_representative_episode_0000.rrd`。
 - repo id：`lerobot/aloha_static_towel`。
 - episode index：0。
 - max frames：60。
@@ -369,7 +369,7 @@ uv run python scripts/physical_ai_package.py import-lerobot \
 validate：
 
 ```bash
-uv run python scripts/physical_ai_package.py validate artifacts/stage4/aloha_smoke_episode_0000 --json
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/aloha_representative_episode_0000 --json
 ```
 
 - 结果：`"ok": true`，`frame_count: 60`，`metric_count: 240`，`artifact_ref_count: 121`，无 errors/warnings。
@@ -377,7 +377,7 @@ uv run python scripts/physical_ai_package.py validate artifacts/stage4/aloha_smo
 summarize：
 
 ```bash
-uv run python scripts/physical_ai_package.py summarize artifacts/stage4/aloha_smoke_episode_0000 --json
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/aloha_representative_episode_0000 --json
 ```
 
 - 结果：`scenario_type: open_robot_manipulation`，`frame_count: 60`，metrics 包含 `action_delta`、`action_norm`、`image_available`、`state_norm`。
@@ -385,18 +385,18 @@ uv run python scripts/physical_ai_package.py summarize artifacts/stage4/aloha_sm
 candidates：
 
 ```bash
-uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/aloha_smoke_episode_0000
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/aloha_representative_episode_0000
 ```
 
-- 结果：通过，写出 `artifacts/stage4/aloha_smoke_episode_0000/derived/candidates.csv`。
+- 结果：通过，写出 `artifacts/stage4/aloha_representative_episode_0000/derived/candidates.csv`。
 
 Rerun 转换与校验：
 
 ```bash
 uv run python scripts/physical_ai_package.py convert-rerun \
-  artifacts/stage4/aloha_smoke_episode_0000 \
-  --output-rrd artifacts/stage4/aloha_smoke_episode_0000.rrd
-uv run rerun rrd verify artifacts/stage4/aloha_smoke_episode_0000.rrd
+  artifacts/stage4/aloha_representative_episode_0000 \
+  --output-rrd artifacts/stage4/aloha_representative_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/aloha_representative_episode_0000.rrd
 ```
 
 - 转换结果：通过，写出 `.rrd`。
