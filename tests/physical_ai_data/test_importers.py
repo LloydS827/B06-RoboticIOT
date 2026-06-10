@@ -67,14 +67,14 @@ def _episode(tmp_path: Path, *, closed: list[bool] | None = None) -> LeRobotEpis
 
 
 def _write_csv_recording_source(root: Path) -> Path:
-    image = root / "images" / "frame_0000.png"
+    image = root / "images" / "front.png"
     image.parent.mkdir(parents=True)
     image.write_bytes(b"fake png bytes")
     rows = [
         {
             "timestamp_s": "0.0",
             "phase": "observe",
-            "image_path": "images/frame_0000.png",
+            "image_path": "images/front.png",
             "metric_name": "object_confidence",
             "metric_value": "0.81",
             "event_type": "start",
@@ -94,8 +94,8 @@ def _write_csv_recording_source(root: Path) -> Path:
             "event_severity": "warning",
             "event_message": "Grip confidence needs review",
             "label_type": "quality",
-            "label_value": "review",
-            "label_confidence": "0.8",
+            "label_value": "",
+            "label_confidence": "",
         },
         {
             "timestamp_s": "0.2",
@@ -418,6 +418,8 @@ def test_csv_recording_importer_generates_valid_package(tmp_path: Path):
     assert labels[0]["target_ref"] == "frame:frame_0000"
     assert labels[0]["confidence"] == "1.0"
     assert labels[1]["target_ref"] == "frame:frame_0001"
+    assert labels[1]["value"] == ""
+    assert labels[1]["confidence"] == "1.0"
 
 
 def test_csv_recording_importer_rejects_source_format_mismatch(tmp_path: Path):

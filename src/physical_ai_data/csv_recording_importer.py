@@ -68,7 +68,13 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
         timestamp_s = input_row.get("timestamp_s", "").strip()
         _finite_float(timestamp_s, "timestamp_s")
 
-        image_ref = _copy_image(source_root, package_root, input_row.get("image_path", ""), copy_images=copy_images)
+        image_ref = _copy_image(
+            source_root,
+            package_root,
+            input_row.get("image_path", ""),
+            frame_id=frame_id,
+            copy_images=copy_images,
+        )
         frame_rows.append(
             {
                 "frame_id": frame_id,
@@ -115,7 +121,7 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
 
         label_type = input_row.get("label_type", "").strip()
         label_value = input_row.get("label_value", "").strip()
-        if label_type and label_value:
+        if label_type:
             confidence = input_row.get("label_confidence", "").strip() or "1.0"
             _finite_float(confidence, "label_confidence")
             label_rows.append(
@@ -160,7 +166,7 @@ def _prepare_package(root: Path) -> None:
             image.unlink()
 
 
-def _copy_image(source_root: Path, package_root: Path, image_path: str, *, copy_images: bool) -> str:
+def _copy_image(source_root: Path, package_root: Path, image_path: str, *, frame_id: str, copy_images: bool) -> str:
     image_path = image_path.strip()
     if not image_path:
         return ""
@@ -173,7 +179,7 @@ def _copy_image(source_root: Path, package_root: Path, image_path: str, *, copy_
     if not source_image.exists():
         raise ValueError(f"source image does not exist: {image_path}")
 
-    image_ref = f"artifacts/images/{relative_image.name}"
+    image_ref = f"artifacts/images/{frame_id}{relative_image.suffix}"
     shutil.copyfile(source_image, package_root / image_ref)
     return image_ref
 
