@@ -9,11 +9,34 @@ import pytest
 
 from physical_ai_data.samples import generate_welding_package
 from physical_ai_data.schema import CANDIDATE_COLUMNS
-from physical_ai_data.training_export import (
-    TRAINING_EVAL_EXPORT_FORMAT,
-    TRAINING_EVAL_SAMPLE_COLUMNS,
-    export_training_eval_draft,
-)
+from physical_ai_data.training_export import export_training_eval_draft
+
+
+EXPECTED_ALLOWED_SPLITS = [
+    "unspecified",
+    "train",
+    "eval",
+    "validation",
+    "test",
+    "holdout",
+]
+EXPECTED_SAMPLE_COLUMNS = [
+    "sample_id",
+    "split",
+    "package_id",
+    "frame_id",
+    "timestamp_s",
+    "candidate_id",
+    "candidate_source_type",
+    "candidate_source_id",
+    "object_id",
+    "score",
+    "reasons",
+    "label_status",
+    "label_ref",
+    "primary_artifact_ref",
+    "package_root",
+]
 
 
 def _rows(path: Path) -> list[dict[str, str]]:
@@ -29,33 +52,50 @@ def _write_rows(path: Path, fieldnames: list[str], rows: list[dict[str, str]]) -
         writer.writerows(rows)
 
 
-def test_export_training_eval_draft_creates_default_manifest_and_samples(tmp_path: Path):
+def test_export_training_eval_draft_creates_default_manifest_and_samples(
+    tmp_path: Path,
+):
     package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=3)
 
     output = export_training_eval_draft(package)
 
     assert output == package / "derived" / "training_eval"
-    manifest = json.loads((output / "training_eval_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (output / "training_eval_manifest.json").read_text(encoding="utf-8")
+    )
     rows = _rows(output / "samples.csv")
 
-    assert manifest["export_format"] == TRAINING_EVAL_EXPORT_FORMAT
+    assert manifest["export_format"] == "physical-ai-training-eval-draft/v0.2"
+    assert manifest["contract_status"] == "draft"
+    assert manifest["formal_format"] is False
+    assert manifest["allowed_splits"] == EXPECTED_ALLOWED_SPLITS
+    assert (
+        manifest["samples_schema_version"]
+        == "physical-ai-training-eval-samples/v0.2"
+    )
     assert manifest["source_package_id"] == "sample_robot_welding_station_seed_3_frames_12"
     assert manifest["source_package_root"] == str(package)
     assert manifest["schema_version"] == "physical-ai-package/v0.1"
     assert manifest["scenario_type"] == "robot_welding_station"
     assert manifest["split"] == "unspecified"
     assert manifest["samples_csv"] == "samples.csv"
+    assert manifest["sample_count"] == len(rows)
     assert manifest["candidate_count"] == len(rows)
+    assert "not a formal training framework format" in manifest["notes"]
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", manifest["created_at"])
 
     assert rows
-    assert list(rows[0].keys()) == TRAINING_EVAL_SAMPLE_COLUMNS
+    assert list(rows[0].keys()) == EXPECTED_SAMPLE_COLUMNS
     assert rows[0]["sample_id"] == "sample_0000"
     assert rows[0]["split"] == "unspecified"
+    assert rows[0]["package_id"] == "sample_robot_welding_station_seed_3_frames_12"
     assert rows[0]["candidate_id"]
-    assert rows[0]["source_type"]
+    assert rows[0]["candidate_source_type"]
+    assert rows[0]["candidate_source_id"]
     assert rows[0]["score"]
     assert rows[0]["label_status"] == "unlabeled"
+    assert rows[0]["label_ref"] == ""
+    assert rows[0]["primary_artifact_ref"]
     assert rows[0]["package_root"] == str(package)
 
 
@@ -93,11 +133,19 @@ def test_export_training_eval_draft_reuses_existing_valid_candidates(tmp_path: P
     rows = _rows(output / "samples.csv")
     assert len(rows) == 1
     assert rows[0]["candidate_id"] == "candidate_manual"
-    assert rows[0]["source_type"] == "event"
+    assert rows[0]["candidate_source_type"] == "event"
+    assert rows[0]["candidate_source_id"] == "event_manual"
+    assert rows[0]["object_id"] == ""
+    assert rows[0]["reasons"] == "precomputed"
     assert rows[0]["score"] == "0.42"
+    assert rows[0]["label_status"] == "unlabeled"
+    assert rows[0]["label_ref"] == ""
+    assert rows[0]["primary_artifact_ref"] == "artifacts/images/frame_0000.png"
 
 
-def test_export_training_eval_draft_rejects_existing_candidates_missing_required_columns(tmp_path: Path):
+def test_export_training_eval_draft_rejects_existing_candidates_missing_required_columns(
+    tmp_path: Path,
+):
     package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=9)
     columns = [column for column in CANDIDATE_COLUMNS if column not in {"score", "source_type"}]
     _write_rows(
@@ -132,15 +180,53 @@ def test_export_training_eval_draft_uses_custom_output_dir(tmp_path: Path):
     assert (output_dir / "training_eval_manifest.json").exists()
 
 
-def test_export_training_eval_draft_preserves_split_verbatim(tmp_path: Path):
-    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=6)
+@pytest.mark.parametrize("split", EXPECTED_ALLOWED_SPLITS)
+def test_export_training_eval_draft_accepts_allowed_splits(tmp_path: Path, split: str):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=10)
 
-    output = export_training_eval_draft(package, split="holdout")
+    output = export_training_eval_draft(package, split=split)
 
-    manifest = json.loads((output / "training_eval_manifest.json").read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (output / "training_eval_manifest.json").read_text(encoding="utf-8")
+    )
     rows = _rows(output / "samples.csv")
-    assert manifest["split"] == "holdout"
-    assert {row["split"] for row in rows} == {"holdout"}
+    assert manifest["split"] == split
+    assert {row["split"] for row in rows} == {split}
+
+
+@pytest.mark.parametrize("split", ["", "Train", "dev", "train/eval"])
+def test_export_training_eval_draft_rejects_invalid_split(tmp_path: Path, split: str):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=11)
+
+    with pytest.raises(ValueError, match="split must be one of"):
+        export_training_eval_draft(package, split=split)
+
+
+def test_export_training_eval_draft_leaves_primary_artifact_empty_for_missing_candidate_frame(
+    tmp_path: Path,
+):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=6)
+    _write_rows(
+        package / "derived" / "candidates.csv",
+        CANDIDATE_COLUMNS,
+        [
+            {
+                "candidate_id": "candidate_missing_frame",
+                "source_type": "event",
+                "source_id": "event_missing_frame",
+                "frame_id": "missing_frame",
+                "object_id": "",
+                "timestamp_s": "0.0",
+                "reasons": "precomputed",
+                "score": "0.42",
+            }
+        ],
+    )
+
+    output = export_training_eval_draft(package)
+
+    rows = _rows(output / "samples.csv")
+    assert rows[0]["primary_artifact_ref"] == ""
 
 
 def test_export_training_eval_draft_rejects_invalid_package_with_validator_code(tmp_path: Path):
