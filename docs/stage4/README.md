@@ -10,10 +10,10 @@ Stage 4 的目标是在不接入真机、不训练模型的前提下，把开源
 python3 -m pip install -e ".[dev]"
 ```
 
-需要运行真实 LeRobot 数据集导入时，再安装可选依赖：
+需要运行真实 LeRobot 数据集导入时，使用本项目独立 `uv` 环境安装可选依赖；`uv.lock` 与 `tool.uv.override-dependencies` 已记录当前 LeRobot loader 与项目 Rerun baseline 的解析结果：
 
 ```bash
-python3 -m pip install -e ".[dev,lerobot]"
+uv sync --extra dev --extra lerobot
 ```
 
 ## PushT Full Acceptance
@@ -21,7 +21,7 @@ python3 -m pip install -e ".[dev,lerobot]"
 PushT full acceptance 使用 `lerobot/pusht` 的一个完整 episode，验证从开源数据到 Physical AI Package，再到候选导出和 Rerun `.rrd` 的完整链路：
 
 ```bash
-PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
+uv run python scripts/physical_ai_package.py import-lerobot \
   --repo-id lerobot/pusht \
   --episode-index 0 \
   --output-dir artifacts/stage4/pusht_episode_0000 \
@@ -33,7 +33,7 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
 本地迭代或网络/下载时间受限时，可以先跑限制帧数的快速 smoke。该命令只验证小帧数链路，不替代 full acceptance：
 
 ```bash
-PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
+uv run python scripts/physical_ai_package.py import-lerobot \
   --repo-id lerobot/pusht \
   --episode-index 0 \
   --output-dir artifacts/stage4/pusht_quick_episode_0000 \
@@ -46,10 +46,10 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
 ALOHA smoke 用于验证多相机和复杂操作数据的代表性兼容性。第一版只要求形成可校验、可转换的轻量数据包，不要求完整语义化全部 ALOHA 字段：
 
 ```bash
-PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
+uv run python scripts/physical_ai_package.py import-lerobot \
   --repo-id lerobot/aloha_static_towel \
   --episode-index 0 \
-  --output-dir artifacts/stage4/aloha_smoke_episode_0000 \
+  --output-dir artifacts/stage4/aloha_representative_episode_0000 \
   --profile aloha \
   --max-frames 60
 ```
@@ -63,11 +63,11 @@ PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot \
 以下命令以 PushT full acceptance 输出目录为例。若检查 quick smoke 或 ALOHA smoke，请替换 package 目录和 `.rrd` 输出路径。
 
 ```bash
-PYTHONPATH=src python3 scripts/physical_ai_package.py validate artifacts/stage4/pusht_episode_0000 --json
-PYTHONPATH=src python3 scripts/physical_ai_package.py summarize artifacts/stage4/pusht_episode_0000 --json
-PYTHONPATH=src python3 scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_episode_0000
-PYTHONPATH=src python3 scripts/physical_ai_package.py convert-rerun artifacts/stage4/pusht_episode_0000 --output-rrd artifacts/stage4/pusht_episode_0000.rrd
-rerun rrd verify artifacts/stage4/pusht_episode_0000.rrd
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/pusht_episode_0000 --json
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/pusht_episode_0000 --json
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_episode_0000
+uv run python scripts/physical_ai_package.py convert-rerun artifacts/stage4/pusht_episode_0000 --output-rrd artifacts/stage4/pusht_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/pusht_episode_0000.rrd
 ```
 
 ## 已知限制
