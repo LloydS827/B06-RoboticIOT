@@ -7,11 +7,17 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Callable
 
-from physical_ai_data.candidates import export_candidates, summarize_package
-from physical_ai_data.rerun_adapter import write_rrd
+from physical_ai_data.importers import ImportRequest, run_import
+from physical_ai_data.lerobot_adapter import LeRobotPackageImporter
 from physical_ai_data.samples import generate_pick_sort_package, generate_welding_package
 from physical_ai_data.schema import ValidationResult
-from physical_ai_data.validation import validate_package
+from physical_ai_data.sdk import (
+    convert_to_rerun,
+    export_candidates_csv,
+    export_training_eval_draft,
+    summarize,
+    validate,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -54,6 +60,12 @@ def _build_parser() -> argparse.ArgumentParser:
     convert.add_argument("package", type=Path, help="Package directory to convert.")
     convert.add_argument("--output-rrd", type=Path, required=True, help="Output .rrd path.")
     convert.set_defaults(func=_convert_rerun)
+
+    training = subcommands.add_parser("export-training-draft", help="Export a training/evaluation draft.")
+    training.add_argument("package", type=Path, help="Package directory to export from.")
+    training.add_argument("--output-dir", type=Path, help="Output directory. Defaults to PACKAGE/derived/training_eval.")
+    training.add_argument("--split", default="unspecified", help="Split label to write into the draft.")
+    training.set_defaults(func=_export_training_draft)
 
     import_lerobot = subcommands.add_parser("import-lerobot", help="Import a LeRobot episode into a Physical AI Package.")
     import_lerobot.add_argument("--repo-id", required=True, help="LeRobot repository ID.")
@@ -98,7 +110,7 @@ def _generate_pick_sort(args: argparse.Namespace) -> int:
 
 
 def _validate(args: argparse.Namespace) -> int:
-    result = validate_package(args.package)
+    result = validate(args.package)
     payload = _validation_payload(args.package, result)
     if args.json:
         _print_json(payload)
@@ -113,57 +125,58 @@ def _validate(args: argparse.Namespace) -> int:
 
 def _summarize(args: argparse.Namespace) -> int:
     if args.json:
-        validation = validate_package(args.package)
+        validation = validate(args.package)
         if not validation.ok:
             _print_json(_validation_payload(args.package, validation))
             return 1
 
-        _print_json(summarize_package(args.package))
+        _print_json(summarize(args.package))
         return 0
 
-    summary = summarize_package(args.package)
+    summary = summarize(args.package)
     print(f"Package summary: {args.package}")
     print(_format_summary(summary))
     return 0
 
 
 def _export_candidates(args: argparse.Namespace) -> int:
-    output = export_candidates(args.package, output_csv=args.output_csv, min_score=args.min_score)
+    output = export_candidates_csv(args.package, output_csv=args.output_csv, min_score=args.min_score)
     print(f"Wrote candidates: {output}")
     return 0
 
 
 def _convert_rerun(args: argparse.Namespace) -> int:
-    output = write_rrd(args.package, args.output_rrd)
+    output = convert_to_rerun(args.package, args.output_rrd)
     print(f"Wrote Rerun recording: {output}")
     return 0
 
 
-def _import_lerobot(args: argparse.Namespace) -> int:
-    from physical_ai_data.lerobot_adapter import import_lerobot_episode
-    from physical_ai_data.lerobot_loader import load_lerobot_episode
+def _export_training_draft(args: argparse.Namespace) -> int:
+    output = export_training_eval_draft(args.package, output_dir=args.output_dir, split=args.split)
+    print(f"Wrote training/evaluation draft: {output}")
+    return 0
 
+
+def _import_lerobot(args: argparse.Namespace) -> int:
     if args.max_frames is not None and args.max_frames <= 0:
         raise ValueError("max_frames must be positive")
 
-    episode = load_lerobot_episode(
-        repo_id=args.repo_id,
-        episode_index=args.episode_index,
-        root=args.root,
-        profile=args.profile,
-        max_frames=args.max_frames,
-        camera=args.camera,
+    request = ImportRequest(
+        source_format="lerobot",
+        source={
+            "repo_id": args.repo_id,
+            "episode_index": args.episode_index,
+            "root": args.root,
+        },
+        output_dir=args.output_dir,
+        options={
+            "profile": args.profile,
+            "max_frames": args.max_frames,
+            "camera": args.camera,
+        },
     )
-    try:
-        package = import_lerobot_episode(
-            episode,
-            args.output_dir,
-            max_frames=args.max_frames,
-            primary_camera=args.camera,
-        )
-    finally:
-        episode.close()
-    print(f"Imported LeRobot episode to Physical AI Package: {package}")
+    result = run_import(LeRobotPackageImporter(), request)
+    print(f"Imported LeRobot episode to Physical AI Package: {result.package_root}")
     return 0
 
 

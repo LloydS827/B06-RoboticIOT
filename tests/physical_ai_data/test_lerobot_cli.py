@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -8,53 +9,46 @@ SCRIPT = Path("scripts/physical_ai_package.py")
 
 
 def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["python3", str(SCRIPT), *args], check=False, text=True, capture_output=True)
+    return subprocess.run([sys.executable, str(SCRIPT), *args], check=False, text=True, capture_output=True)
 
 
-def test_import_lerobot_calls_loader_and_writes_package(monkeypatch, tmp_path: Path, capsys):
+def test_import_lerobot_maps_args_to_importer_request(monkeypatch, tmp_path: Path, capsys):
     from physical_ai_data import cli
-    from physical_ai_data.lerobot_adapter import LeRobotEpisode, LeRobotFrame
+    from physical_ai_data.importers import ImportResult
 
-    front_image = tmp_path / "front.png"
-    front_image.write_bytes(
-        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01"
-        b"\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde"
-        b"\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0\x00\x00\x03\x01"
-        b"\x01\x00\xc9\xfe\x92\xef\x00\x00\x00\x00IEND\xaeB`\x82"
-    )
+    class FakeLeRobotPackageImporter:
+        source_format = "lerobot"
 
-    episode = LeRobotEpisode(
-        repo_id="lerobot/pusht",
-        episode_index=0,
-        fps=10.0,
-        frames=[
-            LeRobotFrame(
-                frame_index=0,
-                timestamp_s=0.0,
-                state=[0.0, 1.0],
-                action=[0.5, 0.25],
-                images={"front": front_image},
-            )
-        ],
-        task_name="PushT",
-        profile="pusht",
-        root=None,
-        features={"observation.state": {"dtype": "float32", "shape": [2]}},
-        stats={"observation.state": {"mean": [0.0, 0.0]}},
-        episode_metadata={"episode_index": 0},
-        task_metadata={"task": "PushT"},
-    )
+    importer_instances = []
 
-    def fake_load_lerobot_episode(**kwargs):
-        assert kwargs["repo_id"] == "lerobot/pusht"
-        assert kwargs["episode_index"] == 0
-        assert kwargs["root"] is None
-        assert kwargs["profile"] == "auto"
-        assert kwargs["max_frames"] == 1
-        assert kwargs["camera"] is None
-        return episode
+    def fake_importer() -> FakeLeRobotPackageImporter:
+        importer = FakeLeRobotPackageImporter()
+        importer_instances.append(importer)
+        return importer
 
-    monkeypatch.setattr("physical_ai_data.lerobot_loader.load_lerobot_episode", fake_load_lerobot_episode)
+    def fake_run_import(importer: FakeLeRobotPackageImporter, request):
+        assert importer is importer_instances[0]
+        assert request.source_format == "lerobot"
+        assert request.source == {
+            "repo_id": "lerobot/pusht",
+            "episode_index": 2,
+            "root": tmp_path / "lerobot-root",
+        }
+        assert request.output_dir == tmp_path / "pkg"
+        assert request.options == {
+            "profile": "aloha",
+            "max_frames": 5,
+            "camera": "wrist",
+        }
+        return ImportResult(
+            package_root=tmp_path / "pkg",
+            source_format="lerobot",
+            source_id="lerobot/pusht#episode=2",
+            frame_count=5,
+        )
+
+    monkeypatch.setattr(cli, "LeRobotPackageImporter", fake_importer)
+    monkeypatch.setattr(cli, "run_import", fake_run_import)
 
     output_dir = tmp_path / "pkg"
     result = cli.main(
@@ -63,18 +57,24 @@ def test_import_lerobot_calls_loader_and_writes_package(monkeypatch, tmp_path: P
             "--repo-id",
             "lerobot/pusht",
             "--episode-index",
-            "0",
+            "2",
             "--output-dir",
             str(output_dir),
+            "--root",
+            str(tmp_path / "lerobot-root"),
+            "--profile",
+            "aloha",
             "--max-frames",
-            "1",
+            "5",
+            "--camera",
+            "wrist",
         ]
     )
 
     captured = capsys.readouterr()
     assert result == 0
-    assert "Physical AI Package" in captured.out
-    assert (output_dir / "physical_ai_manifest.json").exists()
+    assert "Imported LeRobot episode to Physical AI Package" in captured.out
+    assert str(output_dir) in captured.out
 
 
 def test_import_lerobot_help_lists_options():
