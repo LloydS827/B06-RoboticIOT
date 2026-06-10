@@ -22,6 +22,16 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - `PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --help`：通过，帮助输出包含 `--repo-id`、`--episode-index`、`--output-dir`、`--profile`、`--max-frames` 和 `--camera`。
 - 默认测试不需要安装 LeRobot，不访问网络、缓存或真实数据集。
 
+## Stage 4.2：Importer Contract 沉淀
+
+Stage 4.2 没有新增真实 LeRobot smoke 证据，也不替代 Stage 4.1 的真实 PushT/ALOHA smoke。它的目标是把已经跑通的 LeRobot 导入路径沉淀为可复用的外部 importer 边界。
+
+- LeRobot importer 已沉淀为 `LeRobotPackageImporter` contract 实现。
+- CLI `import-lerobot` 的 `--repo-id`、`--episode-index`、`--root` 映射为 `ImportRequest.source`，`--profile`、`--max-frames`、`--camera` 映射为 `ImportRequest.options`。
+- `run_import(LeRobotPackageImporter(), request)` 负责检查 `source_format` 并执行导入，返回 `ImportResult`。
+- 默认测试仍不需要安装 LeRobot，不访问网络，也不依赖 Hugging Face 缓存。
+- Stage 4.1 真实数据 smoke 仍是当前 LeRobot 开放数据链路的主要验收证据。
+
 ## Stage 4.1 uv 环境
 
 - 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证；Task 4 已完成 ALOHA representative smoke 多相机验证；Task 5 已完成 PushT full acceptance 尝试，命令链路通过。Viewer native GUI 人工视觉验收未完成，原因见下方 Task 5 记录。

@@ -70,6 +70,77 @@ uv run python scripts/physical_ai_package.py convert-rerun artifacts/stage4/push
 uv run rerun rrd verify artifacts/stage4/pusht_episode_0000.rrd
 ```
 
+## SDK 快速使用
+
+Stage 4.2 增加了最小 SDK wrapper，面向 Python 调用方复用已有 package 操作。示例以已生成的 PushT package 为输入：
+
+```python
+from physical_ai_data import (
+    convert_to_rerun,
+    export_candidates_csv,
+    export_training_eval_draft,
+    summarize,
+    validate,
+)
+
+package = "artifacts/stage4/pusht_episode_0000"
+
+validation = validate(package)
+summary = summarize(package)
+candidates_csv = export_candidates_csv(package)
+rrd_path = convert_to_rerun(package, "artifacts/stage4/pusht_episode_0000.rrd")
+training_eval_dir = export_training_eval_draft(package, split="eval")
+```
+
+这些入口仍是薄封装，底层数据结构仍以 Physical AI Package 为准。
+
+## External Importer Boundary
+
+Stage 4.2 将外部导入边界显式化为 `ImportRequest`、`ImportResult`、`PackageImporter` 和 `run_import`。LeRobot 当前是第一个 contract 实现：
+
+```python
+from pathlib import Path
+
+from physical_ai_data.importers import ImportRequest, run_import
+from physical_ai_data.lerobot_adapter import LeRobotPackageImporter
+
+request = ImportRequest(
+    source_format="lerobot",
+    source={
+        "repo_id": "lerobot/pusht",
+        "episode_index": 0,
+    },
+    output_dir=Path("artifacts/stage4/pusht_quick_episode_0000"),
+    options={
+        "profile": "pusht",
+        "max_frames": 120,
+    },
+)
+
+result = run_import(LeRobotPackageImporter(), request)
+print(result.package_root, result.frame_count)
+```
+
+`import-lerobot` CLI 现在也是把命令参数映射为 `ImportRequest` 后，通过 `LeRobotPackageImporter` 执行导入。
+
+## Training Draft Export
+
+Stage 4.2 新增 training/evaluation draft export，用于从已校验 package 和 candidates 生成最小草案产物。它不是正式训练格式，只是后续 Stage 4.3 收紧 contract 的起点。
+
+```bash
+uv run python scripts/physical_ai_package.py export-training-draft \
+  artifacts/stage4/pusht_episode_0000 \
+  --split eval
+```
+
+默认输出：
+
+```text
+artifacts/stage4/pusht_episode_0000/derived/training_eval/
+  training_eval_manifest.json
+  samples.csv
+```
+
 ## 已知限制
 
 - 本阶段不连接机器人硬件。
