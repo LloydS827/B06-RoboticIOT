@@ -458,6 +458,99 @@ def test_csv_recording_importer_rejects_absolute_or_parent_image_path(tmp_path: 
         CsvRecordingPackageImporter().import_package(request)
 
 
+def test_csv_recording_importer_rejects_symlink_image_escape(tmp_path: Path):
+    source = tmp_path / "source"
+    outside = tmp_path / "outside"
+    source.mkdir()
+    outside.mkdir()
+    (outside / "escaped.png").write_bytes(b"outside image bytes")
+    try:
+        (source / "images").symlink_to(outside, target_is_directory=True)
+    except (NotImplementedError, OSError) as exc:
+        pytest.skip(f"symlink unsupported: {exc}")
+
+    _write_csv_rows(
+        source / "frames.csv",
+        [
+            "timestamp_s",
+            "phase",
+            "image_path",
+            "metric_name",
+            "metric_value",
+        ],
+        [
+            {
+                "timestamp_s": "0.0",
+                "phase": "observe",
+                "image_path": "images/escaped.png",
+                "metric_name": "",
+                "metric_value": "",
+            }
+        ],
+    )
+    request = ImportRequest(source_format="csv_recording", source={"root": source}, output_dir=tmp_path / "package")
+
+    with pytest.raises(ValueError, match="image_path must be relative to source.root"):
+        CsvRecordingPackageImporter().import_package(request)
+
+
+@pytest.mark.parametrize(
+    "csv_text",
+    [
+        "timestamp_s,phase,image_path,metric_name,metric_value\n0.0,observe,,metric,1.0,extra\n",
+        "timestamp_s,phase,image_path,metric_name,metric_value\n0.0,observe,,metric\n",
+    ],
+)
+def test_csv_recording_importer_rejects_malformed_rows_before_processing(tmp_path: Path, csv_text: str):
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "frames.csv").write_text(csv_text, encoding="utf-8")
+    request = ImportRequest(source_format="csv_recording", source={"root": source}, output_dir=tmp_path / "package")
+
+    with pytest.raises(ValueError, match="frames.csv has malformed rows"):
+        CsvRecordingPackageImporter().import_package(request)
+
+
+def test_csv_recording_importer_removes_nested_stale_images_on_rerun(tmp_path: Path):
+    source = _write_csv_recording_source(tmp_path / "source")
+    output_dir = tmp_path / "package"
+    stale_image = output_dir / "artifacts" / "images" / "stale" / "old.png"
+    stale_image.parent.mkdir(parents=True)
+    stale_image.write_bytes(b"stale image bytes")
+    request = ImportRequest(source_format="csv_recording", source={"root": source}, output_dir=output_dir)
+
+    CsvRecordingPackageImporter().import_package(request)
+
+    assert not stale_image.exists()
+
+
+@pytest.mark.parametrize(
+    ("metric_name", "metric_value"),
+    [
+        ("object_confidence", ""),
+        ("", "0.81"),
+    ],
+)
+def test_csv_recording_importer_ignores_one_sided_metric_fields(
+    tmp_path: Path,
+    metric_name: str,
+    metric_value: str,
+):
+    source = _write_csv_recording_source(tmp_path / "source")
+    rows = _read_csv_rows(source / "frames.csv")
+    rows[0]["metric_name"] = metric_name
+    rows[0]["metric_value"] = metric_value
+    rows[1]["metric_name"] = ""
+    rows[1]["metric_value"] = ""
+    _write_csv_rows(source / "frames.csv", list(rows[0].keys()), rows)
+    request = ImportRequest(source_format="csv_recording", source={"root": source}, output_dir=tmp_path / "package")
+
+    result = CsvRecordingPackageImporter().import_package(request)
+
+    metrics = _read_csv_rows(result.package_root / "metrics.csv")
+    assert metrics == []
+
+
 def test_csv_recording_importer_copy_images_false_leaves_image_refs_empty(tmp_path: Path):
     source = _write_csv_recording_source(tmp_path / "source")
     request = ImportRequest(

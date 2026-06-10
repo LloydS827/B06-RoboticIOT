@@ -53,6 +53,7 @@ def _write_package(source_root: Path, output_dir: Path, *, copy_images: bool) ->
 
     input_rows = read_csv_rows(frames_csv)
     _validate_columns(input_rows, frames_csv)
+    _validate_rows(input_rows)
 
     package_root = Path(output_dir)
     _prepare_package(package_root)
@@ -159,11 +160,16 @@ def _prepare_package(root: Path) -> None:
         path = root / relative_path
         if path.exists():
             path.unlink()
+
+    images_root = root / "artifacts/images"
+    if images_root.exists():
+        if images_root.is_dir() and not images_root.is_symlink():
+            shutil.rmtree(images_root)
+        else:
+            images_root.unlink()
+
     for relative_path in ("artifacts/images", "artifacts/point_clouds", "artifacts/trajectories", "artifacts/source"):
         ensure_dir(root / relative_path)
-    for image in (root / "artifacts/images").glob("*"):
-        if image.is_file():
-            image.unlink()
 
 
 def _copy_image(source_root: Path, package_root: Path, image_path: str, *, frame_id: str, copy_images: bool) -> str:
@@ -175,7 +181,10 @@ def _copy_image(source_root: Path, package_root: Path, image_path: str, *, frame
     if not copy_images:
         return ""
 
-    source_image = source_root / relative_image
+    resolved_source_root = source_root.resolve()
+    source_image = (resolved_source_root / relative_image).resolve()
+    if not source_image.is_relative_to(resolved_source_root):
+        raise ValueError("image_path must be relative to source.root")
     if not source_image.exists():
         raise ValueError(f"source image does not exist: {image_path}")
 
@@ -199,6 +208,12 @@ def _validate_columns(rows: list[dict[str, str]], frames_csv: Path) -> None:
     missing = [column for column in CSV_RECORDING_REQUIRED_COLUMNS if column not in columns]
     if missing:
         raise ValueError(f"frames.csv missing required columns: {', '.join(missing)}")
+
+
+def _validate_rows(rows: list[dict[str, str]]) -> None:
+    for row in rows:
+        if None in row or any(value is None for value in row.values()):
+            raise ValueError("frames.csv has malformed rows")
 
 
 def _read_csv_header(path: Path) -> set[str]:
