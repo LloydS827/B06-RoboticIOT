@@ -380,13 +380,13 @@ def _normalize(value: Any) -> Any:
             pass
     if hasattr(value, "tolist"):
         return _normalize(value.tolist())
-    if isinstance(value, Mapping):
-        return {key: _normalize(item) for key, item in value.items()}
     if hasattr(value, "to_dict"):
         try:
             return _normalize(value.to_dict(orient="records"))
         except TypeError:
             return _normalize(value.to_dict())
+    if isinstance(value, Mapping):
+        return {key: _normalize(item) for key, item in value.items()}
     if isinstance(value, tuple):
         return [_normalize(item) for item in value]
     if isinstance(value, list):

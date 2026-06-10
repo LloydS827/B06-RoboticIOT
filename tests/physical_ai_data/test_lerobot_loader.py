@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+import json
 import sys
 from types import ModuleType
 from pathlib import Path
@@ -165,6 +167,103 @@ def test_loader_falls_back_to_hf_dataset_when_lerobot_rejects_old_format(
             action=[3.0, 4.0],
         )
     ]
+
+
+def test_loader_normalizes_hf_fallback_features_with_to_dict(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise FakeBackwardCompatibilityError("dataset is in 2.1 format")
+
+    class FakeFeature:
+        pass
+
+    class FakeFeatures(Mapping[str, object]):
+        _plain = {
+            "episode_index": {"dtype": "int64"},
+            "observation.state": {"dtype": "float32", "shape": [2]},
+            "action": {"dtype": "float32", "shape": [2]},
+        }
+
+        def __getitem__(self, key: str) -> object:
+            return FakeFeature()
+
+        def __iter__(self):
+            return iter(self._plain)
+
+        def __len__(self) -> int:
+            return len(self._plain)
+
+        def to_dict(self) -> dict[str, object]:
+            return self._plain
+
+    class FakeHFDataset:
+        features = FakeFeatures()
+
+        def __iter__(self):
+            return iter(
+                [
+                    {
+                        "episode_index": 0,
+                        "frame_index": 0,
+                        "observation.state": [1.0, 2.0],
+                        "action": [3.0, 4.0],
+                    }
+                ]
+            )
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        return FakeHFDataset()
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    episode = load_lerobot_episode(repo_id="lerobot/old-format", episode_index=0, max_frames=1)
+
+    assert episode.features == FakeFeatures._plain
+    json.dumps(dict(episode.features))
+
+
+def test_loader_reraises_non_backward_compatibility_lerobot_errors(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    class FakeBackwardCompatibilityError(Exception):
+        pass
+
+    class FakeDataset:
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            raise RuntimeError("network is unavailable")
+
+    def fake_load_dataset(repo_id: str, split: str, streaming: bool):
+        raise AssertionError("HF fallback should not run")
+
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+    backward_module = ModuleType("lerobot.datasets.backward_compatibility")
+    backward_module.BackwardCompatibilityError = FakeBackwardCompatibilityError
+    monkeypatch.setitem(sys.modules, "lerobot.datasets.backward_compatibility", backward_module)
+    datasets_module = ModuleType("datasets")
+    datasets_module.load_dataset = fake_load_dataset
+    monkeypatch.setitem(sys.modules, "datasets", datasets_module)
+
+    with pytest.raises(RuntimeError, match="network is unavailable"):
+        load_lerobot_episode(repo_id="lerobot/fake", episode_index=0, max_frames=1)
 
 
 def test_loader_converts_fake_hf_dataset(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
