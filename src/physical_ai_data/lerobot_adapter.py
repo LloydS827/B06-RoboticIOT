@@ -9,9 +9,11 @@ from pathlib import Path
 import tempfile
 from typing import Mapping, Sequence
 
+from physical_ai_data.importers import ImportRequest, ImportResult
 from physical_ai_data.lerobot_profiles import LeRobotProfile, select_lerobot_profile
 from physical_ai_data.package_io import ensure_dir, write_csv_rows, write_json
 from physical_ai_data.schema import REQUIRED_TABLE_COLUMNS, SCHEMA_VERSION
+from physical_ai_data.validation import validate_package
 
 MANIFEST_FILENAME = "physical_ai_manifest.json"
 FRAME_EXTENSIONS = ["source_frame_index", "image_refs_json"]
@@ -398,4 +400,94 @@ def _write_readme(path: Path, episode: LeRobotEpisode, profile: LeRobotProfile, 
             ]
         ),
         encoding="utf-8",
+    )
+
+
+class LeRobotPackageImporter:
+    source_format = "lerobot"
+
+    def import_package(self, request: ImportRequest) -> ImportResult:
+        if request.source_format != self.source_format:
+            raise ValueError(f"LeRobot importer cannot handle {request.source_format}")
+
+        from physical_ai_data.lerobot_loader import load_lerobot_episode
+
+        repo_id = _required_str(request.source, "repo_id", "source")
+        episode_index = _required_int(request.source, "episode_index", "source")
+        root = request.source.get("root")
+        if root is not None and not isinstance(root, (str, Path)):
+            raise ValueError("source.root must be a path string or Path")
+
+        profile = _optional_str(request.options, "profile", "options") or "auto"
+        max_frames = _optional_int(request.options, "max_frames", "options")
+        camera = _optional_str(request.options, "camera", "options")
+
+        episode = load_lerobot_episode(
+            repo_id=repo_id,
+            episode_index=episode_index,
+            root=root,
+            profile=profile,
+            max_frames=max_frames,
+            camera=camera,
+        )
+        try:
+            package_root = import_lerobot_episode(
+                episode,
+                request.output_dir,
+                max_frames=max_frames,
+                primary_camera=camera,
+            )
+            validation = validate_package(package_root)
+            if not validation.ok:
+                raise ValueError(f"Imported package failed validation: {_format_validation_errors(validation.errors)}")
+            frame_count = validation.summary.get("frame_count")
+            if not isinstance(frame_count, int):
+                frame_count = len(episode.frames)
+            return ImportResult(
+                package_root=package_root,
+                source_format=self.source_format,
+                source_id=f"{repo_id}#episode={episode_index}",
+                frame_count=frame_count,
+                warnings=[f"{warning.code}: {warning.message}" for warning in validation.warnings],
+            )
+        finally:
+            episode.close()
+
+
+def _required_str(values: Mapping[str, object], key: str, prefix: str) -> str:
+    value = values.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{prefix}.{key} must be a string")
+    return value
+
+
+def _required_int(values: Mapping[str, object], key: str, prefix: str) -> int:
+    value = values.get(key)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{prefix}.{key} must be an integer")
+    return value
+
+
+def _optional_str(values: Mapping[str, object], key: str, prefix: str) -> str | None:
+    value = values.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{prefix}.{key} must be a string")
+    return value
+
+
+def _optional_int(values: Mapping[str, object], key: str, prefix: str) -> int | None:
+    value = values.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{prefix}.{key} must be an integer")
+    return value
+
+
+def _format_validation_errors(errors: Sequence[object]) -> str:
+    return "; ".join(
+        f"{getattr(error, 'code', 'validation_error')}: {getattr(error, 'message', str(error))}"
+        for error in errors
     )

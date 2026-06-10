@@ -86,11 +86,27 @@
 - Stage 4.1 已完成 `lerobot/pusht` full acceptance 尝试：不加 `--max-frames` 导入 161 frames，validate/summarize/export-candidates/convert-rerun 和 full/quick/ALOHA representative `.rrd verify` 均通过；native Rerun GUI 在当前自动化环境触发 wgpu surface 尺寸错误，Viewer/Blueprint 人工视觉验收未完成，仅保留 headless Viewer 截图和 `.rrd verify` 证据。
 - Stage 4.1 最终回归完成：`uv run python -m pytest -q` 返回 `99 passed`，最终整体 review 为 No findings；本地生成的 `.venv/`、`artifacts/`、cache、`.rrd` 均未纳入 git 跟踪。
 
+### 2026-06-10
+
+- 完成 Stage 4.2 SDK wrapper / external importer 边界设计文档：`docs/superpowers/specs/2026-06-10-sdk-wrapper-importer-boundary-design.md`。
+- 完成 Stage 4.2 实施计划：`docs/superpowers/plans/2026-06-10-sdk-wrapper-importer-boundary.md`。
+- 新增最小 Python SDK wrapper：`from physical_ai_data import validate, summarize, export_candidates_csv, convert_to_rerun, export_training_eval_draft`。
+- 新增 external importer contract：`ImportRequest`、`ImportResult`、`PackageImporter` 和 `run_import`，把外部数据源到 Physical AI Package 的边界显式化。
+- 将 LeRobot importer 沉淀为 `LeRobotPackageImporter` contract 实现，`import-lerobot` CLI 参数映射为 `ImportRequest` 后再通过 `run_import` 执行。
+- 新增 training/evaluation draft export：`physical_ai_data.training_export.export_training_eval_draft`，默认输出 `PACKAGE/derived/training_eval/training_eval_manifest.json` 和 `samples.csv`。
+- 新增 CLI 子命令 `export-training-draft`，用于从已有 package candidates 生成最小 training/evaluation draft。
+- 修复 SDK import-side-effect 测试的进程内 `sys.modules` 清理副作用，避免与 importer monkeypatch 测试产生顺序依赖。
+- 本轮最终验证结果：
+  - `python -m pytest tests/physical_ai_data/test_sdk.py -q`：`3 passed in 0.72s`。
+  - `python -m pytest tests/physical_ai_data/test_training_export.py tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_importers.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_lerobot_cli.py -q`：`35 passed in 2.20s`。
+  - `python -m pytest -q`：`123 passed in 4.62s`。
+
 ## 下一步计划
 
 1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
-2. 如需要固定多相机展示体验，基于 ALOHA representative `.rrd` 补充项目自定义 Blueprint 或最小 Viewer 启动说明。
-3. 推进 Physical AI Package SDK wrapper、external importer 边界、训练/评估导出和后端替换边界。
+2. Stage 4.3 收紧 training/evaluation export contract，明确 draft manifest、samples 字段、split 语义和后续正式格式边界。
+3. 设计一个非 LeRobot external importer fixture 或真实业务 importer candidate，验证 importer contract 不是 LeRobot 专用接口。
+4. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend。
 
 ## 维护约定
 
