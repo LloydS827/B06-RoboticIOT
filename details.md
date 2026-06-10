@@ -95,9 +95,11 @@
 - 将 LeRobot importer 沉淀为 `LeRobotPackageImporter` contract 实现，`import-lerobot` CLI 参数映射为 `ImportRequest` 后再通过 `run_import` 执行。
 - 新增 training/evaluation draft export：`physical_ai_data.training_export.export_training_eval_draft`，默认输出 `PACKAGE/derived/training_eval/training_eval_manifest.json` 和 `samples.csv`。
 - 新增 CLI 子命令 `export-training-draft`，用于从已有 package candidates 生成最小 training/evaluation draft。
-- 本轮文档收尾前验证结果：
-  - `python -m pytest tests/physical_ai_data/test_training_export.py tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_importers.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_lerobot_cli.py -q`：`2 failed, 33 passed in 2.27s`，失败项为 `test_lerobot_package_importer_reports_validation_error_codes` 和 `test_lerobot_package_importer_returns_validation_warning_code_and_message`。
-  - `python -m pytest -q`：`123 passed in 2.74s`。
+- 修复 SDK import-side-effect 测试的进程内 `sys.modules` 清理副作用，避免与 importer monkeypatch 测试产生顺序依赖。
+- 本轮最终验证结果：
+  - `python -m pytest tests/physical_ai_data/test_sdk.py -q`：`3 passed in 0.72s`。
+  - `python -m pytest tests/physical_ai_data/test_training_export.py tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_importers.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_lerobot_cli.py -q`：`35 passed in 2.20s`。
+  - `python -m pytest -q`：`123 passed in 4.62s`。
 
 ## 下一步计划
 

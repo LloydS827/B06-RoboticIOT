@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import importlib
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -43,37 +43,31 @@ def test_top_level_exports_sdk_functions():
 
 
 def test_public_sdk_imports_do_not_load_cli_lerobot_or_rerun():
-    for module_name in list(sys.modules):
-        if (
-            module_name == "physical_ai_data"
-            or module_name.startswith("physical_ai_data.")
-            or module_name == "lerobot"
-            or module_name.startswith("lerobot.")
-            or module_name == "rerun"
-            or module_name.startswith("rerun.")
-        ):
-            sys.modules.pop(module_name, None)
+    code = """
+import sys
+import physical_ai_data
+import physical_ai_data.sdk
 
-    imported_package = importlib.import_module("physical_ai_data")
-    imported_sdk = importlib.import_module("physical_ai_data.sdk")
-    importlib.reload(imported_sdk)
-    importlib.reload(imported_package)
+loaded_modules = set(sys.modules)
+forbidden_modules = {
+    "physical_ai_data.cli",
+    "physical_ai_data.lerobot_adapter",
+    "physical_ai_data.lerobot_loader",
+    "physical_ai_data.lerobot_profiles",
+}
+forbidden_roots = ("lerobot", "rerun")
+offenders = sorted(
+    module_name
+    for module_name in loaded_modules
+    if module_name in forbidden_modules
+    or any(module_name == root or module_name.startswith(f"{root}.") for root in forbidden_roots)
+)
+if offenders:
+    raise SystemExit("Forbidden imports: " + ", ".join(offenders))
+"""
+    result = subprocess.run([sys.executable, "-c", code], check=False, text=True, capture_output=True)
 
-    loaded_modules = set(sys.modules)
-    forbidden_modules = {
-        "physical_ai_data.cli",
-        "physical_ai_data.lerobot_adapter",
-        "physical_ai_data.lerobot_loader",
-        "physical_ai_data.lerobot_profiles",
-    }
-    forbidden_roots = ("lerobot", "rerun")
-
-    assert forbidden_modules.isdisjoint(loaded_modules)
-    assert not [
-        module_name
-        for module_name in loaded_modules
-        if any(module_name == root or module_name.startswith(f"{root}.") for root in forbidden_roots)
-    ]
+    assert result.returncode == 0, result.stderr or result.stdout
 
 
 def test_sdk_wraps_stable_package_operations_for_pick_sort(tmp_path: Path):
@@ -98,4 +92,3 @@ def test_sdk_wraps_stable_package_operations_for_pick_sort(tmp_path: Path):
 
     assert rrd == tmp_path / "pick.rrd"
     assert rrd.exists()
-
