@@ -23,7 +23,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 
 ## Stage 4.1 uv 环境
 
-- 状态：Task 1 环境基线已建立；本任务未运行真实 LeRobot 数据 import，PushT quick/full 和 ALOHA smoke 仍待后续任务执行。
+- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证。PushT full acceptance 和 ALOHA smoke 仍待后续任务执行。
 - 工作区检查：`git status --short` 初始输出为空，未发现需要保留的既有改动。
 - `uv` 可用性：
   - `command -v uv`：`/Users/lloyd/.local/bin/uv`
@@ -77,7 +77,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
   - `du -sh .venv`：`1.6G`
   - `df -h .`：`/dev/disk3s5 460Gi 171Gi 251Gi 41% /System/Volumes/Data`
 - 本地生成状态：`.venv/`、下载数据、cache、`artifacts/`、`.rrd` 和 `*.egg-info/` 均为本地生成状态，不提交；本轮显式补充 `.venv/`、`*.egg-info/` 到 `.gitignore`。
-- 下方 PushT/ALOHA 结果为 Stage 4.1 环境建立前的历史记录；本节已解除 LeRobot 可选依赖安装阻塞，但本任务不运行真实数据 import，因此真实 smoke 状态仍待后续任务更新。
+- 下方 PushT full acceptance 与 ALOHA 结果为 Stage 4.1 环境建立前的历史记录；PushT quick smoke 已由 Task 3 更新为真实全链路结果。
 
 ## Task 2 真实 Loader Preflight
 
@@ -135,10 +135,79 @@ Likely causes:
 - stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
 - 因导入未完成，未生成 package，后续 validate/summarize/export-candidates/convert-rerun/`rerun rrd verify` 未运行。
 
+## Task 3：PushT Quick Smoke 全链路验证
+
+- 清理旧生成物：
+
+```bash
+rm -rf artifacts/stage4/pusht_quick_episode_0000 artifacts/stage4/pusht_quick_episode_0000.rrd
+```
+
+- 导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/pusht \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/pusht_quick_episode_0000 \
+  --profile pusht \
+  --max-frames 120
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/pusht_quick_episode_0000`。
+- 包路径：`artifacts/stage4/pusht_quick_episode_0000`。
+- Rerun 路径：`artifacts/stage4/pusht_quick_episode_0000.rrd`。
+- 测试与复跑：
+  - `uv run python -m pytest -q`：`96 passed in 2.43s`。
+  - 再次运行同一 PushT quick import：通过。
+- validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/pusht_quick_episode_0000 --json
+```
+
+  - 结果：`"ok": true`，`frame_count: 120`，`artifact_ref_count: 121`，无 errors/warnings。
+- summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/pusht_quick_episode_0000 --json
+```
+
+  - 结果：`scenario_type: open_robot_manipulation`，`frame_count: 120`，metrics 包含 `action_delta`、`action_norm`、`image_available`、`state_norm`。
+- candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/pusht_quick_episode_0000
+```
+
+  - 结果：通过，写出 `artifacts/stage4/pusht_quick_episode_0000/derived/candidates.csv`。
+  - 候选数量：116。
+- Rerun 转换与校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/pusht_quick_episode_0000 \
+  --output-rrd artifacts/stage4/pusht_quick_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
+```
+
+  - 转换结果：通过，写出 `.rrd`。
+  - `rerun rrd verify`：`1 file verified without error.`
+- 包结构检查：
+  - `source_dataset.repo_id`: `lerobot/pusht`。
+  - `source_dataset.episode_index`: 0。
+  - `source_dataset.profile`: `pusht`。
+  - `source_dataset.fps`: 30.0。
+  - frame 数：120。
+  - 相机名：无。
+  - state/action 维度：2 / 2。
+  - 第一帧：`robot_state_ref=artifacts/source/frame_state_action.csv`，`image_ref` 为空，`image_refs_json={}`。
+  - `image_available` 取值：`0.0`，表示本轮 PushT quick package 未生成图像引用；不伪造相机或图像 artifact。
+  - metric names：`action_delta`、`action_norm`、`image_available`、`state_norm`。
+
 ## 历史记录：PushT Quick Smoke 结果
 
-- 本轮未运行 quick smoke。
-- 原因：full acceptance 的阻塞不是下载体积、网络或时间限制，而是本地缺少 `lerobot` 可选依赖；quick smoke 会在同一依赖检查处失败。
+- Stage 4.1 环境建立前曾因本地缺少 `lerobot` 可选依赖而未运行 quick smoke；该状态已由上方 Task 3 真实验证结果取代。
 - quick smoke 只作为本地迭代和阻塞排查手段，不替代 PushT full acceptance。
 
 ## 历史记录：ALOHA Smoke 结果
@@ -159,7 +228,6 @@ Likely causes:
 ## 下一步
 
 1. 由主线程运行 PushT full acceptance，并把真实命令输出补入本文档。
-2. 如果 full acceptance 受阻，先运行 PushT quick smoke，记录阻塞原因和最小可用链路结果。
-3. 运行 ALOHA representative smoke，确认多相机 artifact 与 Rerun adapter 输出。
-4. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
-5. 基于真实 smoke 结果校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。
+2. 运行 ALOHA representative smoke，确认多相机 artifact 与 Rerun adapter 输出。
+3. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
+4. 基于后续 full/smoke 结果校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。
