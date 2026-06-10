@@ -197,6 +197,98 @@ print(result.package_root, result.frame_count)
 
 输出 package 的 `source_dataset.format` 为 `csv_recording`，并记录源目录、源 `frames.csv` 引用、frame count 和转换时间。图片路径必须相对 `source.root`，不能是绝对路径或包含路径回退。
 
+## Weld Workcell Importer Candidate
+
+Stage 4.4 新增 `WeldWorkcellPackageImporter`，作为机器人焊接工站业务导出 importer candidate。它验证 external importer contract 能承接多文件业务导出、工艺参数、事件和人工复核标签，但仍是离线样板，不是生产 connector，不暴露 CLI，也不连接真实机器人、PLC、OPC UA、MES、HMI 或数据库。
+
+输入目录固定为本地文件：
+
+```text
+source_root/
+  job.json
+  frames.csv
+  process.csv
+  events.csv
+  review_labels.csv
+  images/
+```
+
+`review_labels.csv` 和 `images/` 可选；其他文件必需。
+
+`job.json` 必需字段：
+
+```text
+work_order_id,station_id,robot_id,welder_id,part_id,seam_id,task_name,created_at
+```
+
+`frames.csv` 必需列：
+
+```text
+timestamp_s,phase,tcp_x,tcp_y,tcp_z,tcp_qx,tcp_qy,tcp_qz,tcp_qw,image_path
+```
+
+`process.csv` 必需列：
+
+```text
+timestamp_s,weld_current_a,weld_voltage_v,wire_feed_mpm,gas_flow_lpm,travel_speed_mm_s,defect_probability
+```
+
+`events.csv` 必需列：
+
+```text
+timestamp_s,event_type,severity,message,object_id
+```
+
+`review_labels.csv` 若存在，必需列为：
+
+```text
+timestamp_s,label_type,value,confidence
+```
+
+可选列 `review_status`、`reviewer` 只保留在 `artifacts/source/review_labels.csv`，不会扩展当前 Physical AI Package `labels.csv` schema。
+
+Python 调用示例：
+
+```python
+from pathlib import Path
+
+from physical_ai_data.importers import ImportRequest, run_import
+from physical_ai_data.weld_workcell_importer import WeldWorkcellPackageImporter
+
+result = run_import(
+    WeldWorkcellPackageImporter(),
+    ImportRequest(
+        source_format="weld_workcell",
+        source={"root": Path("fixtures/weld_workcell_export")},
+        output_dir=Path("artifacts/stage4/weld_workcell_package"),
+        options={"copy_images": True},
+    ),
+)
+
+print(result.package_root, result.frame_count)
+```
+
+输出仍是 `physical-ai-package/v0.1`，`scenario_type` 为 `robot_welding_station`。源 JSON/CSV 会复制到 `artifacts/source/`，TCP 轨迹写入 `artifacts/trajectories/tcp_path.csv`，图片在 `copy_images=True` 时复制为 `artifacts/images/frame_XXXX.ext`。`copy_images=False` 时 `frames.csv` 的 `image_ref` 为空，但源 CSV 仍保留原始 `image_path` 以供追溯。
+
+生成的数据包可继续被现有链路消费：
+
+```python
+from physical_ai_data.candidates import export_candidates, summarize_package
+from physical_ai_data.rerun_adapter import write_rrd
+from physical_ai_data.training_export import export_training_eval_draft
+from physical_ai_data.validation import validate_package
+
+package = result.package_root
+
+validation = validate_package(package)
+summary = summarize_package(package)
+candidates_csv = export_candidates(package)
+training_eval_dir = export_training_eval_draft(package, split="eval")
+rrd_path = write_rrd(package, "artifacts/stage4/weld_workcell_package.rrd")
+```
+
+Rerun 仍只是可替换 adapter backend；主数据结构仍是 Physical AI Package。
+
 ## 已知限制
 
 - 本阶段不连接机器人硬件。
@@ -204,4 +296,5 @@ print(result.package_root, result.frame_count)
 - 真实 LeRobot smoke 依赖网络、Hugging Face 数据集可用性、本地缓存和 LeRobot 版本。
 - ALOHA smoke 是兼容性 smoke，不是完整语义映射；未在源数据中明确给出的机器人标定、相机外参、成功/失败标签和任务质量不会被推断。
 - CSV Recording importer 是 contract fixture，不是正式业务系统 connector。
+- Weld Workcell importer 是业务 importer candidate，不是生产业务系统 connector。
 - Rerun 仍作为 adapter backend 使用，Physical AI Package 是当前主数据包结构。

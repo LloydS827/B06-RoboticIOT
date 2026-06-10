@@ -114,12 +114,25 @@
 - Stage 4.3 继续保持 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend。
 - Stage 4.3 本轮最终验证结果：
   - `python -m pytest -q`：`148 passed in 3.21s`。
+- 完成 Stage 4.4 Weld Workcell 业务 importer candidate 设计文档：`docs/superpowers/specs/2026-06-10-stage-4-4-weld-workcell-importer-design.md`。
+- 完成 Stage 4.4 实施计划：`docs/superpowers/plans/2026-06-10-stage-4-4-weld-workcell-importer.md`。
+- 新增 `WeldWorkcellPackageImporter`：
+  - source format 为 `weld_workcell`，继续复用 `ImportRequest`、`ImportResult` 和 `run_import`。
+  - 输入为本地机器人焊接工站业务导出目录，必需 `job.json`、`frames.csv`、`process.csv`、`events.csv`，可选 `review_labels.csv` 和图片目录。
+  - 输出为 `robot_welding_station` Physical AI Package，保留源 JSON/CSV 到 `artifacts/source/`，并写入 TCP 轨迹、metrics、events、labels 和 source_dataset traceability。
+  - 支持 `copy_images=True/False`；图片路径在两种模式下都需要通过相对路径、存在性和 symlink escape 校验。
+  - `review_status` 和 `reviewer` 只保留在 source artifact，不扩展当前 `labels.csv` schema。
+- Stage 4.4 将 importer contract 从 LeRobot/fixture 推进到第一个贴近业务的多文件导出 candidate，但不新增 CLI、registry、plugin lifecycle，也不接真实机器人、PLC、OPC UA、MES、HMI 或数据库。
+- Stage 4.4 输出 package 已验证可继续进入 validate、summarize、export-candidates、training/evaluation draft export 和非 GUI Rerun `.rrd` adapter。
+- Stage 4.4 本轮最终验证结果：
+  - `python -m pytest tests/physical_ai_data/test_weld_workcell_importer.py tests/physical_ai_data/test_rerun_adapter.py tests/physical_ai_data/test_training_export.py -q`：`51 passed in 0.78s`。
+  - `python -m pytest -q`：`173 passed in 2.69s`。
 
 ## 下一步计划
 
-1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
-2. 进入 Stage 4.4 或 Stage 5 前置：选择第一个真实业务 importer candidate，例如智能工站 CSV/日志导出、机器人焊接工艺记录或 HMI 任务记录，而不是继续增加开放数据特例。
-3. 基于 Stage 4.3 的 draft sample index，设计 label schema、人工复核状态、评估样本集和正式训练导出格式边界。
+1. 基于 Stage 4.4 的 `review_labels.csv` 最小映射，进入 label schema / 人工复核状态 / 评估样本集设计，明确哪些字段进入 package schema，哪些继续保留为 source artifact。
+2. 选择一个真实业务导出样本或更贴近现场的脱敏 fixture，对 `weld_workcell` contract 做一次字段现实性校准，避免 importer candidate 停留在过于理想化的模拟输入。
+3. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
 4. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend；正式产品能力优先沉淀在 package schema、SDK、importer contract 和数据治理文档中。
 
 ## 维护约定
