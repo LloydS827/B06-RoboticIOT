@@ -474,3 +474,90 @@ def test_loader_writes_tensor_images_to_temporary_png(monkeypatch: pytest.Monkey
 
     assert image_path.suffix == ".png"
     assert image_path.exists()
+
+
+def test_loader_extracts_metadata_video_cameras_to_temporary_pngs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    from PIL import Image
+
+    class FakeVideoFrame:
+        def __init__(self, color: tuple[int, int, int]) -> None:
+            self.color = color
+
+        def to_image(self) -> Image.Image:
+            return Image.new("RGB", (2, 2), self.color)
+
+    class FakeContainer:
+        def __init__(self, path: str) -> None:
+            self.path = path
+
+        def __enter__(self) -> FakeContainer:
+            return self
+
+        def __exit__(self, *exc_info: object) -> None:
+            pass
+
+        def decode(self, video: int = 0):
+            assert video == 0
+            color = (255, 0, 0) if "cam_high" in self.path else (0, 255, 0)
+            yield FakeVideoFrame(color)
+            yield FakeVideoFrame(color)
+
+    def fake_av_open(path: str) -> FakeContainer:
+        return FakeContainer(path)
+
+    class FakeMeta:
+        fps = 50.0
+        root = tmp_path
+        video_keys = ["observation.images.cam_high", "observation.images.cam_left_wrist"]
+        features = {
+            "observation.images.cam_high": {"dtype": "video"},
+            "observation.images.cam_left_wrist": {"dtype": "video"},
+            "observation.state": {},
+            "action": {},
+        }
+
+        def get_video_file_path(self, ep_index: int, vid_key: str) -> Path:
+            assert ep_index == 0
+            return Path("videos") / vid_key / "chunk-000" / "file-000.mp4"
+
+    class FakeDataset:
+        meta = FakeMeta()
+
+        def __init__(self, repo_id: str, root: Path | None = None, episodes: list[int] | None = None) -> None:
+            for video_key in self.meta.video_keys:
+                video_path = tmp_path / self.meta.get_video_file_path(0, video_key)
+                video_path.parent.mkdir(parents=True, exist_ok=True)
+                video_path.write_bytes(b"fake video")
+            self.hf_dataset = [
+                {
+                    "episode_index": 0,
+                    "frame_index": 0,
+                    "timestamp": 0.0,
+                    "observation.state": [],
+                    "action": [],
+                },
+                {
+                    "episode_index": 0,
+                    "frame_index": 1,
+                    "timestamp": 0.02,
+                    "observation.state": [],
+                    "action": [],
+                },
+            ]
+
+    fake_av_module = ModuleType("av")
+    fake_av_module.open = fake_av_open
+    monkeypatch.setitem(sys.modules, "av", fake_av_module)
+    install_fake_lerobot_module(
+        monkeypatch,
+        "lerobot.datasets.lerobot_dataset",
+        FakeDataset,
+    )
+
+    episode = load_lerobot_episode(repo_id="lerobot/aloha_static_towel", episode_index=0, max_frames=2)
+
+    assert sorted(episode.frames[0].images) == ["cam_high", "cam_left_wrist"]
+    assert sorted(episode.frames[1].images) == ["cam_high", "cam_left_wrist"]
+    assert all(path.suffix == ".png" and path.exists() for path in episode.frames[0].images.values())

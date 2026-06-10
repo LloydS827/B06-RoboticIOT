@@ -12,6 +12,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 - 新增 `pusht`、`aloha`、`fallback` profile，分别覆盖 PushT 主验收、ALOHA 代表性 smoke 和未知 LeRobot repo 的保守映射。
 - 新增 lazy LeRobot loader，只有执行真实 `import-lerobot` 时才导入 LeRobot。
 - 新增 CLI 子命令 `import-lerobot`，支持 `--repo-id`、`--episode-index`、`--output-dir`、`--root`、`--profile`、`--max-frames`、`--camera`。
+- LeRobot loader 支持从 metadata `video_keys` 和 `get_video_file_path(...)` 提取真实视频相机帧；当行数据没有已解码图像字段时，可按 metadata 明确列出的相机解码为临时 PNG，再写入 package 图像 artifact。
 - Rerun adapter 已支持读取 `image_refs_json` 中的额外相机引用，用于多相机 LeRobot 数据包回放。
 - candidate export 已扩展 LeRobot 相关候选关键字，例如 `action_delta`、`timestamp_gap` 和 `image_missing`；当前 adapter 直接生成 `action_norm`、`state_norm`、`action_delta` 和 `image_available` 等基础 metric。
 
@@ -23,7 +24,7 @@ Stage 4 的目标是把 Physical AI Package 从 simulation-first 样例推进到
 
 ## Stage 4.1 uv 环境
 
-- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证。PushT full acceptance 和 ALOHA smoke 仍待后续任务执行。
+- 状态：Task 1 环境基线已建立；Task 3 已完成 PushT quick smoke 全链路验证；Task 4 已完成 ALOHA representative smoke 多相机验证。PushT full acceptance 仍待后续任务执行。
 - 工作区检查：`git status --short` 初始输出为空，未发现需要保留的既有改动。
 - `uv` 可用性：
   - `command -v uv`：`/Users/lloyd/.local/bin/uv`
@@ -210,12 +211,93 @@ uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
 - Stage 4.1 环境建立前曾因本地缺少 `lerobot` 可选依赖而未运行 quick smoke；该状态已由上方 Task 3 真实验证结果取代。
 - quick smoke 只作为本地迭代和阻塞排查手段，不替代 PushT full acceptance。
 
-## 历史记录：ALOHA Smoke 结果
+## Task 4：ALOHA Representative Smoke 全链路验证
 
-- 命令：`PYTHONPATH=src python3 scripts/physical_ai_package.py import-lerobot --repo-id lerobot/aloha_sim_transfer_cube_human --episode-index 0 --output-dir artifacts/stage4/final_aloha_smoke_episode_0000 --profile aloha --max-frames 60`
-- 结果：未通过，阻塞于本地未安装 LeRobot 可选依赖。
-- stderr：`Error: Install the lerobot optional dependency with \`pip install '.[lerobot]'\` to load real LeRobot datasets.`
-- 因导入未完成，未生成 package，后续 validate/convert-rerun/`rerun rrd verify` 未运行。
+- 替换原因：原指定 `lerobot/aloha_sim_transfer_cube_human` 可导入 60 帧 state/action，但 metadata 仅暴露 `observation.images.top` 单相机视频字段；真实导入后 `image_refs_json={}`，不满足 ALOHA representative smoke 的多相机硬要求。
+- 替代 repo：`lerobot/aloha_static_towel`，公开 ALOHA-family 数据集，metadata 暴露 4 个视频相机字段：`observation.images.cam_high`、`observation.images.cam_left_wrist`、`observation.images.cam_low`、`observation.images.cam_right_wrist`。
+- 兼容修复：loader 针对真实 ALOHA metadata 视频字段新增聚焦支持；先用 fake fixture 复现“行数据无图像字段、metadata 有 video_keys”的失败，再用 PyAV 按 metadata 明确视频路径解码帧图像。不推断相机标定、双臂关节语义、成功/失败标签或隐藏 metadata。
+
+清理旧生成物：
+
+```bash
+rm -rf artifacts/stage4/aloha_smoke_episode_0000 artifacts/stage4/aloha_smoke_episode_0000.rrd
+```
+
+导入命令：
+
+```bash
+uv run python scripts/physical_ai_package.py import-lerobot \
+  --repo-id lerobot/aloha_static_towel \
+  --episode-index 0 \
+  --output-dir artifacts/stage4/aloha_smoke_episode_0000 \
+  --profile aloha \
+  --max-frames 60
+```
+
+- 结果：通过，输出 `Imported LeRobot episode to Physical AI Package: artifacts/stage4/aloha_smoke_episode_0000`。
+- 包路径：`artifacts/stage4/aloha_smoke_episode_0000`。
+- Rerun 路径：`artifacts/stage4/aloha_smoke_episode_0000.rrd`。
+- repo id：`lerobot/aloha_static_towel`。
+- episode index：0。
+- max frames：60。
+- fps：50.0。
+- state/action 维度：14 / 14。
+- 多相机 refs：已观察到并写入 `image_refs_json`。
+- 相机：`cam_high`、`cam_left_wrist`、`cam_low`、`cam_right_wrist`。
+- 第一帧：`image_ref=artifacts/images/cam_high/frame_0000.png`；`image_refs_json` 包含 4 个相机到 `artifacts/images/<camera>/frame_0000.png` 的引用。
+- 图像 artifact 数：240（60 frames x 4 cameras）。
+
+测试与复跑：
+
+- `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py::test_loader_extracts_metadata_video_cameras_to_temporary_pngs -q`：先失败于 `episode.frames[0].images == {}`，修复后 `1 passed`。
+- `uv run python -m pytest tests/physical_ai_data/test_lerobot_loader.py tests/physical_ai_data/test_lerobot_profiles.py -q`：`15 passed`。
+- `uv run python -m pytest -q`：`97 passed in 2.67s`。
+- 再次运行同一 ALOHA import：通过。
+
+validate：
+
+```bash
+uv run python scripts/physical_ai_package.py validate artifacts/stage4/aloha_smoke_episode_0000 --json
+```
+
+- 结果：`"ok": true`，`frame_count: 60`，`metric_count: 240`，`artifact_ref_count: 121`，无 errors/warnings。
+
+summarize：
+
+```bash
+uv run python scripts/physical_ai_package.py summarize artifacts/stage4/aloha_smoke_episode_0000 --json
+```
+
+- 结果：`scenario_type: open_robot_manipulation`，`frame_count: 60`，metrics 包含 `action_delta`、`action_norm`、`image_available`、`state_norm`。
+
+candidates：
+
+```bash
+uv run python scripts/physical_ai_package.py export-candidates artifacts/stage4/aloha_smoke_episode_0000
+```
+
+- 结果：通过，写出 `artifacts/stage4/aloha_smoke_episode_0000/derived/candidates.csv`。
+
+Rerun 转换与校验：
+
+```bash
+uv run python scripts/physical_ai_package.py convert-rerun \
+  artifacts/stage4/aloha_smoke_episode_0000 \
+  --output-rrd artifacts/stage4/aloha_smoke_episode_0000.rrd
+uv run rerun rrd verify artifacts/stage4/aloha_smoke_episode_0000.rrd
+```
+
+- 转换结果：通过，写出 `.rrd`。
+- `rerun rrd verify`：`1 file verified without error.`
+
+多相机检查输出：
+
+```text
+frame_count: 60
+cameras: ['cam_high', 'cam_left_wrist', 'cam_low', 'cam_right_wrist']
+first_image_ref: artifacts/images/cam_high/frame_0000.png
+first_image_refs_json: {'cam_high': 'artifacts/images/cam_high/frame_0000.png', 'cam_left_wrist': 'artifacts/images/cam_left_wrist/frame_0000.png', 'cam_low': 'artifacts/images/cam_low/frame_0000.png', 'cam_right_wrist': 'artifacts/images/cam_right_wrist/frame_0000.png'}
+```
 
 ## 风险限制
 
@@ -228,6 +310,5 @@ uv run rerun rrd verify artifacts/stage4/pusht_quick_episode_0000.rrd
 ## 下一步
 
 1. 由主线程运行 PushT full acceptance，并把真实命令输出补入本文档。
-2. 运行 ALOHA representative smoke，确认多相机 artifact 与 Rerun adapter 输出。
-3. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
-4. 基于后续 full/smoke 结果校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。
+2. 补充 Viewer/Blueprint 人工检查，记录多相机显示、时间线、事件和指标观察结果。
+3. 基于后续 full acceptance 结果继续校准 mapping 文档，明确是否需要新增 profile 字段或 loader 兼容逻辑。

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 import tempfile
 from typing import Any
@@ -28,6 +28,7 @@ def load_lerobot_episode(
     root_path = Path(root) if root is not None else None
     dataset = _open_dataset(LeRobotDataset, repo_id, root_path, episode_index)
     selected_profile = select_lerobot_profile(repo_id, profile)
+    video_image_sources = _metadata_video_image_sources(dataset, episode_index, camera)
 
     frames: list[LeRobotFrame] = []
     first_row: Mapping[str, Any] | None = None
@@ -38,7 +39,10 @@ def load_lerobot_episode(
             continue
         if first_row is None:
             first_row = row
-        frames.append(_frame_from_row(row, len(frames), camera))
+        frame = _frame_from_row(row, len(frames), camera)
+        if video_image_sources:
+            frame.images.update(_next_video_images(video_image_sources, frame.images))
+        frames.append(frame)
         if max_frames is not None and len(frames) >= max_frames:
             break
 
@@ -160,6 +164,78 @@ def _image_refs(row: Mapping[str, Any], selected_camera: str | None) -> dict[str
         if path is None:
             continue
         images[camera] = path
+    return images
+
+
+def _metadata_video_image_sources(
+    dataset: Any,
+    episode_index: int,
+    selected_camera: str | None,
+) -> dict[str, Iterator[Path]]:
+    meta = getattr(dataset, "meta", None)
+    video_keys = _normalize(getattr(meta, "video_keys", None) if meta is not None else None)
+    if not isinstance(video_keys, list):
+        return {}
+    sources: dict[str, Iterator[Path]] = {}
+    for video_key in video_keys:
+        if not isinstance(video_key, str):
+            continue
+        camera = _camera_name(video_key, selected_camera)
+        if selected_camera is not None and camera != selected_camera:
+            continue
+        video_path = _metadata_video_path(dataset, episode_index, video_key)
+        if video_path is None:
+            continue
+        sources[camera] = _temporary_video_frame_paths(video_path, camera)
+    return sources
+
+
+def _metadata_video_path(dataset: Any, episode_index: int, video_key: str) -> Path | None:
+    meta = getattr(dataset, "meta", None)
+    get_video_file_path = getattr(meta, "get_video_file_path", None) if meta is not None else None
+    if get_video_file_path is None:
+        return None
+    try:
+        relative_path = Path(get_video_file_path(episode_index, video_key))
+    except (TypeError, ValueError, KeyError, IndexError):
+        return None
+    if relative_path.is_absolute():
+        return relative_path
+    root = getattr(meta, "root", None) if meta is not None else None
+    if root is None:
+        root = getattr(dataset, "root", None)
+    if root is None:
+        return None
+    return Path(root) / relative_path
+
+
+def _temporary_video_frame_paths(video_path: Path, camera: str) -> Iterator[Path]:
+    try:
+        import av
+    except ImportError:
+        return
+    if not video_path.exists():
+        return
+    output_dir = Path(tempfile.mkdtemp(prefix="physical_ai_lerobot_video_images_"))
+    with av.open(str(video_path)) as container:
+        for frame_index, video_frame in enumerate(container.decode(video=0)):
+            output_path = output_dir / f"{_safe_filename(camera)}_{frame_index:04d}.png"
+            video_frame.to_image().save(output_path)
+            yield output_path
+
+
+def _next_video_images(
+    sources: Mapping[str, Iterator[Path]],
+    existing_images: Mapping[str, Path],
+) -> dict[str, Path]:
+    images: dict[str, Path] = {}
+    for camera, source in sources.items():
+        if camera in existing_images:
+            continue
+        try:
+            images[camera] = next(source)
+        except StopIteration:
+            continue
     return images
 
 
