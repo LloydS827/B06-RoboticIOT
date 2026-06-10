@@ -100,13 +100,27 @@
   - `python -m pytest tests/physical_ai_data/test_sdk.py -q`：`3 passed in 0.72s`。
   - `python -m pytest tests/physical_ai_data/test_training_export.py tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_importers.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_lerobot_cli.py -q`：`35 passed in 2.20s`。
   - `python -m pytest -q`：`123 passed in 4.62s`。
+- 完成 Stage 4.3 training/evaluation export contract 与非 LeRobot importer 设计文档：`docs/superpowers/specs/2026-06-10-stage-4-3-training-importer-contract-design.md`。
+- 完成 Stage 4.3 实施计划：`docs/superpowers/plans/2026-06-10-stage-4-3-training-importer-contract.md`。
+- 将 training/evaluation draft export 收紧为 `physical-ai-training-eval-draft/v0.2`：
+  - manifest 明确 `contract_status=draft`、`formal_format=false`、`allowed_splits`、`samples_schema_version`、`sample_count` 和 `candidate_count`。
+  - split 只允许 `unspecified`、`train`、`eval`、`validation`、`test`、`holdout`，默认仍为 `unspecified`，不做自动切分。
+  - `samples.csv` 明确 package、candidate 来源、label 占位和 `primary_artifact_ref` 字段，继续声明不是正式训练框架格式。
+- 新增非 LeRobot `CsvRecordingPackageImporter` fixture：
+  - source format 为 `csv_recording`，通过现有 `ImportRequest`、`ImportResult` 和 `run_import` 执行。
+  - 输入为本地单文件 `frames.csv` 和可选相对图片，输出标准 Physical AI Package。
+  - manifest `source_dataset` 记录源目录、源 CSV 引用、frame count 和转换时间。
+  - 该 importer 用于 contract 验证，不新增 CLI、registry 或生产业务 connector。
+- Stage 4.3 继续保持 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend。
+- Stage 4.3 本轮最终验证结果：
+  - `python -m pytest -q`：`148 passed in 3.21s`。
 
 ## 下一步计划
 
 1. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
-2. Stage 4.3 收紧 training/evaluation export contract，明确 draft manifest、samples 字段、split 语义和后续正式格式边界。
-3. 设计一个非 LeRobot external importer fixture 或真实业务 importer candidate，验证 importer contract 不是 LeRobot 专用接口。
-4. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend。
+2. 进入 Stage 4.4 或 Stage 5 前置：选择第一个真实业务 importer candidate，例如智能工站 CSV/日志导出、机器人焊接工艺记录或 HMI 任务记录，而不是继续增加开放数据特例。
+3. 基于 Stage 4.3 的 draft sample index，设计 label schema、人工复核状态、评估样本集和正式训练导出格式边界。
+4. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend；正式产品能力优先沉淀在 package schema、SDK、importer contract 和数据治理文档中。
 
 ## 维护约定
 
