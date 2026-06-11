@@ -128,12 +128,27 @@
   - `python -m pytest tests/physical_ai_data/test_weld_workcell_importer.py tests/physical_ai_data/test_rerun_adapter.py tests/physical_ai_data/test_training_export.py -q`：`51 passed in 0.78s`。
   - `python -m pytest -q`：`173 passed in 2.69s`。
 
+### 2026-06-11
+
+- 确认下一阶段不再命名为 Stage 4.5，而是进入 **Stage 5：业务接入与交付文档阶段**。
+- 完成 Stage 5 业务接入与交付文档设计文档：`docs/superpowers/specs/2026-06-11-stage-5-handoff-docs-design.md`。
+- 完成 Stage 5 Handoff Docs 实施计划：`docs/superpowers/plans/2026-06-11-stage-5-handoff-docs.md`。
+- 更新根目录 `README.md`，使其从研发路线记录进一步变成项目入口，覆盖当前可用能力、快速开始、常用命令、工程团队对接、文档目录、当前边界和当前状态。
+- 新增 Stage 5 总览文档：`docs/stage5/README.md`，说明本阶段从技术可行性转向业务 handoff，给出面向对象、阅读顺序、系统产出物、最小验收流程和非目标。
+- 新增工程团队对接文档：`docs/stage5/engineering_handoff.md`，覆盖对接目标、工程团队需要准备的数据、推荐导出目录、字段 contract、Python 调用方式、系统产出物、验收 checklist、常见错误和对接会议问题清单。
+- 在 `docs/stage4/README.md` 增加 Stage 5 工程对接入口，并将 Weld Workcell 示例源目录改为明确占位路径 `path/to/source_root`，避免误认为仓库内已有真实 fixture。
+- Stage 5 本轮不新增生产代码、CLI、SDK API、package schema 或真实业务数据；目标是把 Stage 2-4.4 的研发成果整理为工程团队可读、可准备、可验收的交付材料。
+- Stage 5 本轮最终验证结果：
+  - `python scripts/physical_ai_package.py generate welding --output-dir /tmp/stage5_demo_weld`、`validate`、`summarize`、`export-candidates`、`export-training-draft --split eval`、`convert-rerun`：全部 exit 0，生成 `/tmp/stage5_demo_weld/derived/candidates.csv`、`/tmp/stage5_demo_weld/derived/training_eval/samples.csv` 和 `/tmp/stage5_demo_weld.rrd`。
+  - `python -m pytest -q`：`173 passed in 3.06s`。
+
 ## 下一步计划
 
-1. 基于 Stage 4.4 的 `review_labels.csv` 最小映射，进入 label schema / 人工复核状态 / 评估样本集设计，明确哪些字段进入 package schema，哪些继续保留为 source artifact。
-2. 选择一个真实业务导出样本或更贴近现场的脱敏 fixture，对 `weld_workcell` contract 做一次字段现实性校准，避免 importer candidate 停留在过于理想化的模拟输入。
-3. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
-4. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend；正式产品能力优先沉淀在 package schema、SDK、importer contract 和数据治理文档中。
+1. 使用 Stage 5 handoff 文档与工程团队、机器人团队对接，收集一份真实或脱敏的焊接工站业务导出样本。
+2. 用真实/脱敏样本校准 `weld_workcell` contract，记录字段缺口、时间戳同步问题、图片/视频导出方式和工艺参数采样频率。
+3. 基于真实样本和人工复核流程，决定 label schema、review status、评估样本集边界，以及哪些字段进入 package schema、哪些继续保留为 source artifact。
+4. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4/5 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
+5. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend；正式产品能力优先沉淀在 package schema、SDK、importer contract 和数据治理文档中。
 
 ## 维护约定
 

@@ -259,7 +259,7 @@ result = run_import(
     WeldWorkcellPackageImporter(),
     ImportRequest(
         source_format="weld_workcell",
-        source={"root": Path("fixtures/weld_workcell_export")},
+        source={"root": Path("path/to/source_root")},
         output_dir=Path("artifacts/stage4/weld_workcell_package"),
         options={"copy_images": True},
     ),
@@ -288,6 +288,10 @@ rrd_path = write_rrd(package, "artifacts/stage4/weld_workcell_package.rrd")
 ```
 
 Rerun 仍只是可替换 adapter backend；主数据结构仍是 Physical AI Package。
+
+## Stage 5 工程对接入口
+
+如果准备与工程团队或机器人团队对接真实/脱敏业务导出，请优先阅读 [Stage 5 业务接入与交付文档](../stage5/README.md) 和 [工程团队对接说明](../stage5/engineering_handoff.md)。Stage 4 文档保留 importer 与开放数据样板链路细节，Stage 5 文档负责对接流程、字段准备、验收 checklist 和线下沟通问题清单。
 
 ## 已知限制
 
