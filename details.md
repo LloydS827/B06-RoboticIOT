@@ -141,14 +141,27 @@
 - Stage 5 本轮最终验证结果：
   - `python scripts/physical_ai_package.py generate welding --output-dir /tmp/stage5_demo_weld`、`validate`、`summarize`、`export-candidates`、`export-training-draft --split eval`、`convert-rerun`：全部 exit 0，生成 `/tmp/stage5_demo_weld/derived/candidates.csv`、`/tmp/stage5_demo_weld/derived/training_eval/samples.csv` 和 `/tmp/stage5_demo_weld.rrd`。
   - `python -m pytest -q`：`173 passed in 3.06s`。
+- 确认 Stage 6 定义为 **真机数据接入与数据资产化试点**，阶段主线从离线 handoff 文档推进到真实机器人数据接入路径、数据资产边界和后续产品化取舍。
+- Stage 6 关键决策：
+  - 真机接入优先，优先围绕真实 SDK/TCP JSON/文件/DB payload 样本校准数据链路，而不是继续扩展仿真能力。
+  - 现有素材/数据模块升级为真机数据资产模块，用于承接 Raw Zone、Clean Zone、脱敏、字段映射、候选样本和验收记录。
+  - 独立产品路线预留，但本阶段不把 Stage 6 试点直接固化为正式产品内核。
+  - Rerun 继续定位为可替换 replay backend；本阶段不 fork Rerun、不把 Rerun 作为主产品内核、不自研 viewer。
+- 新增真机数据素材入口：`docs/real-data/1.jpg`、`docs/real-data/2.jpg`、`docs/real-data/README.md`。
+- 新增 Stage 6 设计与执行文档：`docs/superpowers/specs/2026-06-11-stage-6-real-robot-ingestion-design.md`、`docs/superpowers/plans/2026-06-11-stage-6-real-robot-ingestion.md`、`docs/stage6/README.md`、`docs/stage6/real_robot_data_asset_module.md`、`docs/stage6/real_data_field_mapping.md`。
+- 更新根目录 `README.md` 和 Stage 5 文档，使离线 handoff 被重新定位为脱敏交换、回归测试和离线验收格式；Stage 6 的主线则转向真机数据接入和数据资产化。
+- Stage 6 本轮不新增生产 connector、DB schema、TCP/IP server、SDK bridge、package schema changes 或正式训练数据集格式；后续是否扩展这些能力，需要基于真实样本和字段缺口再判断。
+- Stage 6 本轮最终验证结果：
+  - CLI 链路：`python scripts/physical_ai_package.py generate welding --output-dir /tmp/stage6_demo_weld`、`python scripts/physical_ai_package.py validate /tmp/stage6_demo_weld --json`、`python scripts/physical_ai_package.py summarize /tmp/stage6_demo_weld --json`、`python scripts/physical_ai_package.py export-candidates /tmp/stage6_demo_weld`、`python scripts/physical_ai_package.py export-training-draft /tmp/stage6_demo_weld --split eval`、`python scripts/physical_ai_package.py convert-rerun /tmp/stage6_demo_weld --output-rrd /tmp/stage6_demo_weld.rrd`：全部 exit 0，生成 `/tmp/stage6_demo_weld/derived/candidates.csv`、`/tmp/stage6_demo_weld/derived/training_eval/samples.csv` 和 `/tmp/stage6_demo_weld.rrd`。
+  - 全量测试：`python -m pytest -q`：`173 passed in 3.35s`。
 
 ## 下一步计划
 
-1. 使用 Stage 5 handoff 文档与工程团队、机器人团队对接，收集一份真实或脱敏的焊接工站业务导出样本。
-2. 用真实/脱敏样本校准 `weld_workcell` contract，记录字段缺口、时间戳同步问题、图片/视频导出方式和工艺参数采样频率。
-3. 基于真实样本和人工复核流程，决定 label schema、review status、评估样本集边界，以及哪些字段进入 package schema、哪些继续保留为 source artifact。
-4. 在可稳定启动 native GUI 或 web viewer 的环境中补做 Stage 4/5 Viewer/Blueprint 人工视觉验收，记录 GUI 观察、截图、布局保存和显示异常。
-5. 保留 Rerun backend 替换边界：继续让 Physical AI Package 作为主数据结构，Rerun 作为可替换 adapter backend；正式产品能力优先沉淀在 package schema、SDK、importer contract 和数据治理文档中。
+1. 收集真实 SDK/TCP JSON/文件/DB payload 示例。
+2. 确认 AI 控制器 Raw Zone / Clean Zone 存储位置、权限和脱敏边界。
+3. 选择一个最小焊接作业窗口。
+4. 明确时间戳来源、字段单位、坐标系、采样频率和数据保存策略。
+5. 基于真实样本决定后续是否需要 connector skeleton、package schema 扩展、数据库 schema 或只演进 importer/清洗流程。
 
 ## 维护约定
 
