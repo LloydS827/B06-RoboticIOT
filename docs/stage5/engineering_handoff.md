@@ -6,6 +6,8 @@
 
 当前对接目标是形成可验证的交付样板，不是连接真实 PLC、OPC UA、MES、HMI、机器人控制器或数据库。
 
+Stage 6 后，本文档的定位是离线 handoff 格式，用于脱敏样本交换、回归测试、离线验收和字段 contract 对照；它不是唯一或最终的真机接入路径。在线/准在线真机接入主线应参考 Stage 6 文档中 AI 控制器侧接入、存储、清洗、Physical AI Package 生成、Rerun 回放和训练数据准备的规划。
+
 ## 工程团队需要准备什么
 
 - 一次作业或一小段连续作业窗口，能导出稳定的时间序列数据。
@@ -193,3 +195,4 @@ python scripts/physical_ai_package.py convert-rerun artifacts/stage5/weld_workce
 - 当前不扩展 Physical AI Package schema；复核状态和复核人只保留在 source artifact。
 - 当前不推断真实质量结论，不训练模型，也不自动生成正式训练集。
 - Rerun 是可替换 adapter backend；主数据结构仍是 Physical AI Package。
+- 在线/准在线真机数据接入、AI 控制器侧 Raw Zone / Clean Zone、接口待确认项和真机数据资产模块规划，请参考 `docs/stage6/README.md`、`docs/stage6/real_robot_data_asset_module.md` 和 `docs/stage6/real_data_field_mapping.md`。
