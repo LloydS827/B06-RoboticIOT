@@ -132,7 +132,7 @@ docs/stage5/engineering_handoff.md
 - 一次作业或一小段作业窗口。
 - 任务上下文：工单、工位、机器人、焊机、工件、焊缝、任务名、创建时间。
 - 帧级数据：时间戳、阶段、TCP 位姿、可选图片。
-- 工艺参数：电流、电压、送丝速度、气体流量、行走速度、缺陷概率或质量评分。
+- 工艺参数：电流、电压、送丝速度、气体流量、行走速度、缺陷概率或风险评分。
 - 事件记录：时间戳、事件类型、等级、消息、关联对象。
 - 可选人工复核：标签类型、值、置信度、复核状态、复核人。
 
@@ -177,7 +177,7 @@ result = run_import(
     WeldWorkcellPackageImporter(),
     ImportRequest(
         source_format="weld_workcell",
-        source={"root": Path("fixtures/weld_workcell_export")},
+        source={"root": Path("path/to/source_root")},
         output_dir=Path("artifacts/stage5/weld_workcell_package"),
         options={"copy_images": True},
     ),
@@ -243,7 +243,7 @@ import 成功后立即产生：
 - 图片/视频帧如何导出。
 - 工艺参数采样频率。
 - 事件和报警日志字段。
-- 缺陷/质量评分来源。
+- 缺陷概率/风险评分来源；若源系统只有质量分，需要确认转换规则。
 - 数据脱敏和客户现场边界。
 
 ### 5.4 Stage 4 文档调整

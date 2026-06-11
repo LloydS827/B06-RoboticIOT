@@ -11,7 +11,7 @@
 - 一次作业或一小段连续作业窗口，能导出稳定的时间序列数据。
 - 任务上下文：工单、工位、机器人、焊机、工件、焊缝、任务名、创建时间。
 - 帧级数据：时间戳、阶段、TCP 位姿、可选图片路径。
-- 工艺参数：电流、电压、送丝速度、气体流量、行走速度、缺陷概率或质量评分。
+- 工艺参数：电流、电压、送丝速度、气体流量、行走速度、缺陷概率或风险评分。
 - 事件记录：时间戳、事件类型、等级、消息、关联对象。
 - 可选人工复核：标签类型、值、置信度、复核状态、复核人。
 
@@ -84,7 +84,7 @@ source_root/
 | `wire_feed_mpm` | 是 | 送丝速度，单位 m/min | `7.1` | 写入 `wire_feed` metric。 |
 | `gas_flow_lpm` | 是 | 气体流量，单位 L/min | `15.0` | 写入 `gas_flow` metric。 |
 | `travel_speed_mm_s` | 是 | 行走速度，单位 mm/s | `4.5` | 写入 `travel_speed` metric。 |
-| `defect_probability` | 是 | 缺陷概率或质量评分 | `0.08` | 写入 `defect_probability` metric，当前不自动解释好坏。 |
+| `defect_probability` | 是 | 缺陷概率或风险评分 | `0.08` | 写入 `defect_probability` metric；数值越高表示越值得关注。若现场只有“质量分越高越好”的字段，需要先转换为风险语义再导出。 |
 
 ### `events.csv`
 
@@ -119,7 +119,7 @@ result = run_import(
     WeldWorkcellPackageImporter(),
     ImportRequest(
         source_format="weld_workcell",
-        source={"root": Path("fixtures/weld_workcell_export")},
+        source={"root": Path("path/to/source_root")},
         output_dir=Path("artifacts/stage5/weld_workcell_package"),
         options={"copy_images": True},
     ),
@@ -183,7 +183,7 @@ python scripts/physical_ai_package.py convert-rerun artifacts/stage5/weld_workce
 - 图片/视频导出路径：导出图片、抽帧图片或视频帧索引的路径规则和保留周期。
 - 工艺参数采样频率：`process.csv` 相对 `frames.csv` 的频率、插值需求和丢点策略。
 - 事件/报警字段：现场事件类型、等级、消息和关联对象如何映射到 `events.csv`。
-- defect/quality score source：`defect_probability` 或质量评分来自规则、视觉、人工复核还是外部质检系统。
+- defect/risk score source：`defect_probability` 或风险评分来自规则、视觉、人工复核还是外部质检系统；若源系统只有质量分，需要确认转换规则。
 - 脱敏和客户边界：工单、人员、设备、图片、日志中哪些字段需要脱敏，哪些数据不能离开现场。
 
 ## 当前边界

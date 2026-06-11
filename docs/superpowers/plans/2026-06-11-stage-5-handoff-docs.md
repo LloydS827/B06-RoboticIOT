@@ -245,7 +245,7 @@ result = run_import(
     WeldWorkcellPackageImporter(),
     ImportRequest(
         source_format="weld_workcell",
-        source={"root": Path("fixtures/weld_workcell_export")},
+        source={"root": Path("path/to/source_root")},
         output_dir=Path("artifacts/stage5/weld_workcell_package"),
         options={"copy_images": True},
     ),
@@ -302,7 +302,7 @@ Meeting questions must cover:
 - image/video export path.
 - process sampling frequency.
 - event/alarm fields.
-- defect/quality score source.
+- defect/risk score source, including conversion rules if the source system only has a quality score where larger means better.
 - desensitization/customer boundary.
 
 - [ ] **Step 7: Run field-contract consistency check**
