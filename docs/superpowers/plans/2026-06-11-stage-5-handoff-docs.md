@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Status note:** This file records the implementation plan. The completed Stage 5 delivery status, verification evidence, and next-stage planning are recorded in `details.md`.
+
 **Goal:** 将 Stage 2-4.4 的研发成果整理成面向项目使用者和工程/机器人团队的 Stage 5 业务接入与交付文档包。
 
 **Architecture:** 本阶段只做文档与索引更新，不新增 importer、CLI、SDK API 或 package schema。根 README 做项目入口和快速开始，`docs/stage5/README.md` 做交付阶段总览，`docs/stage5/engineering_handoff.md` 做工程团队对接材料，`details.md` 记录阶段台账与下一步计划。
