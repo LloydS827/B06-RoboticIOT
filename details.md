@@ -177,10 +177,10 @@
   - `details.md`：记录 Stage 7 决策、产出物、验证命令和 Stage 8-oriented 下一步计划。
 - 验证前确认当前 Python editable install 原指向外层仓库，先在本 worktree 运行 `python -m pip install -e ".[dev]"`，随后用户指定的 package chain smoke 可正确解析 `physical_ai_data.stage7_sim_window`。
 - Stage 7 本轮最终验证命令：
-  - `python -m pytest tests/physical_ai_data/test_stage7_sim_window.py -q`：`6 passed in 0.91s`。
+  - `python -m pytest tests/physical_ai_data/test_stage7_sim_window.py -q`：`7 passed in 0.52s`。
   - `python scripts/generate_stage7_sim_window.py --output-root /tmp/stage7_sim_weld_window --frames 5`：exit 0，生成 `/tmp/stage7_sim_weld_window/raw` 和 `/tmp/stage7_sim_weld_window/clean/weld_workcell`。
   - package chain smoke：`run_import` 生成 `/tmp/stage7_chain/package`；`validate --json` 返回 `ok: true`、`frame_count: 5`、`event_count: 2`、`label_count: 1`、`metric_count: 30`；`summarize --json`、`export-candidates`、`export-training-draft --split eval` 和 `convert-rerun` 均 exit 0，生成 `/tmp/stage7_chain/package/derived/candidates.csv`、`/tmp/stage7_chain/package/derived/training_eval` 和 `/tmp/stage7_chain/package.rrd`。
-  - `python -m pytest -q`：`179 passed in 3.02s`。
+  - `python -m pytest -q`：`180 passed in 2.96s`。
 
 ## 下一步计划
 
