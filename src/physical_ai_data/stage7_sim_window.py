@@ -34,7 +34,7 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
     if frame_count < 3:
         raise ValueError("stage7 frame_count must be at least 3")
 
-    root = Path(output_root) / "stage7_window"
+    root = Path(output_root)
     raw_root = root / "raw"
     clean_root = root / "clean" / "weld_workcell"
     result = Stage7SimWindowResult(root=root, raw_root=raw_root, clean_root=clean_root)

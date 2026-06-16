@@ -20,10 +20,12 @@ def _json_lines(path: Path) -> list[dict[str, object]]:
 
 
 def test_generate_stage7_sim_weld_window_writes_raw_and_clean_fixture(tmp_path: Path):
-    result = generate_stage7_sim_weld_window(tmp_path)
+    fixture_root = tmp_path / "stage7_window"
+    result = generate_stage7_sim_weld_window(fixture_root)
 
-    assert result.raw_root == tmp_path / "stage7_window" / "raw"
-    assert result.clean_root == tmp_path / "stage7_window" / "clean" / "weld_workcell"
+    assert result.root == fixture_root
+    assert result.raw_root == fixture_root / "raw"
+    assert result.clean_root == fixture_root / "clean" / "weld_workcell"
 
     raw_manifest = json.loads((result.raw_root / "manifest.raw.json").read_text(encoding="utf-8"))
     assert raw_manifest["stage"] == "stage7"
@@ -116,5 +118,5 @@ def test_generate_stage7_sim_window_script_smoke(tmp_path: Path):
 
     assert result.returncode == 0, result.stderr + result.stdout
     assert "Generated Stage 7 simulated weld window" in result.stdout
-    assert (output_root / "stage7_window" / "raw" / "manifest.raw.json").is_file()
-    assert (output_root / "stage7_window" / "clean" / "weld_workcell" / "job.json").is_file()
+    assert (output_root / "raw" / "manifest.raw.json").is_file()
+    assert (output_root / "clean" / "weld_workcell" / "job.json").is_file()

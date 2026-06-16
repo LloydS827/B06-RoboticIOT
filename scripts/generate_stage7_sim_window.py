@@ -29,7 +29,12 @@ def main(argv: list[str] | None = None) -> int:
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Generate a deterministic Stage 7 simulated weld window fixture.")
-    parser.add_argument("--output-root", type=Path, required=True, help="Directory that will receive stage7_window/.")
+    parser.add_argument(
+        "--output-root",
+        type=Path,
+        required=True,
+        help="Output root directory that will receive raw/ and clean/ fixture directories.",
+    )
     parser.add_argument("--frames", type=int, default=5, help="Number of frames to generate.")
     return parser
 
