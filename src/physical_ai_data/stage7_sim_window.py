@@ -19,23 +19,26 @@ SEAM_ID = "sim_seam_001"
 TASK_NAME = "Stage 7 simulated weld window"
 CREATED_AT = "2026-06-16T00:00:00Z"
 GENERATED_MARKER = ".stage7_sim_window_generated"
-RAW_TOP_LEVEL_ENTRIES = {
+RAW_ALLOWED_PATHS = {
     GENERATED_MARKER,
     "manifest.raw.json",
-    "sdk",
-    "tcp_json",
-    "files",
-    "process",
-    "events",
+    "sdk/robot_state.ndjson",
+    "tcp_json/hmi_task_messages.ndjson",
+    "files/robot_program.lua",
+    "files/robot_trajectory.json",
+    "files/seam_trajectory.json",
+    "files/images/front_0000.png",
+    "process/welding_process.csv",
+    "events/event_log.ndjson",
 }
-CLEAN_TOP_LEVEL_ENTRIES = {
+CLEAN_ALLOWED_PATHS = {
     GENERATED_MARKER,
     "job.json",
     "frames.csv",
     "process.csv",
     "events.csv",
     "review_labels.csv",
-    "images",
+    "images/front_0000.png",
 }
 TINY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
@@ -59,8 +62,8 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
     result = Stage7SimWindowResult(root=root, raw_root=raw_root, clean_root=clean_root)
 
     _prepare_generated_roots(
-        (raw_root, RAW_TOP_LEVEL_ENTRIES),
-        (clean_root, CLEAN_TOP_LEVEL_ENTRIES),
+        (raw_root, RAW_ALLOWED_PATHS),
+        (clean_root, CLEAN_ALLOWED_PATHS),
     )
     frames = _frames(frame_count)
 
@@ -70,22 +73,33 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
 
 
 def _prepare_generated_roots(*roots: tuple[Path, set[str]]) -> None:
-    for root, allowed_entries in roots:
-        _validate_generated_root(root, allowed_entries)
-    for root, _allowed_entries in roots:
+    for root, allowed_paths in roots:
+        _validate_generated_root(root, allowed_paths)
+    for root, _allowed_paths in roots:
         _reset_generated_root(root)
 
 
-def _validate_generated_root(root: Path, allowed_entries: set[str]) -> None:
+def _validate_generated_root(root: Path, allowed_files: set[str]) -> None:
     if root.exists():
         if root.is_dir() and not root.is_symlink():
-            entries = {entry.name for entry in root.iterdir()}
-            if not entries:
+            existing_paths = {entry.relative_to(root).as_posix() for entry in root.rglob("*")}
+            if not existing_paths:
                 return
-            if GENERATED_MARKER not in entries or entries - allowed_entries:
+            allowed_paths = allowed_files | _allowed_directories(allowed_files)
+            if GENERATED_MARKER not in existing_paths or existing_paths - allowed_paths:
                 raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
         else:
             raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
+
+
+def _allowed_directories(allowed_files: set[str]) -> set[str]:
+    directories: set[str] = set()
+    for allowed_file in allowed_files:
+        parent = Path(allowed_file).parent
+        while parent != Path("."):
+            directories.add(parent.as_posix())
+            parent = parent.parent
+    return directories
 
 
 def _reset_generated_root(root: Path) -> None:

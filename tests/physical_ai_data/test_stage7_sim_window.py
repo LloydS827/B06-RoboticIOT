@@ -96,6 +96,21 @@ def test_generate_stage7_sim_weld_window_refuses_unknown_files_added_to_generate
     assert clean_sentinel.read_text(encoding="utf-8") == "user clean data\n"
 
 
+def test_generate_stage7_sim_weld_window_refuses_unknown_nested_files_added_to_generated_roots(tmp_path: Path):
+    fixture_root = tmp_path / "stage7_window"
+    result = generate_stage7_sim_weld_window(fixture_root)
+    raw_sentinel = result.raw_root / "files" / "user_keep.txt"
+    clean_sentinel = result.clean_root / "images" / "user_keep.png"
+    raw_sentinel.write_text("nested raw data\n", encoding="utf-8")
+    clean_sentinel.write_bytes(b"nested clean data\n")
+
+    with pytest.raises(ValueError, match="refusing to overwrite non-stage7 fixture directory"):
+        generate_stage7_sim_weld_window(fixture_root)
+
+    assert raw_sentinel.read_text(encoding="utf-8") == "nested raw data\n"
+    assert clean_sentinel.read_bytes() == b"nested clean data\n"
+
+
 def test_generate_stage7_sim_weld_window_can_overwrite_own_generated_roots(tmp_path: Path):
     fixture_root = tmp_path / "stage7_window"
     generate_stage7_sim_weld_window(fixture_root, frame_count=5)
