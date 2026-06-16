@@ -155,13 +155,39 @@
   - CLI 链路：`python scripts/physical_ai_package.py generate welding --output-dir /tmp/stage6_demo_weld`、`python scripts/physical_ai_package.py validate /tmp/stage6_demo_weld --json`、`python scripts/physical_ai_package.py summarize /tmp/stage6_demo_weld --json`、`python scripts/physical_ai_package.py export-candidates /tmp/stage6_demo_weld`、`python scripts/physical_ai_package.py export-training-draft /tmp/stage6_demo_weld --split eval`、`python scripts/physical_ai_package.py convert-rerun /tmp/stage6_demo_weld --output-rrd /tmp/stage6_demo_weld.rrd`：全部 exit 0，生成 `/tmp/stage6_demo_weld/derived/candidates.csv`、`/tmp/stage6_demo_weld/derived/training_eval/samples.csv` 和 `/tmp/stage6_demo_weld.rrd`。
   - 全量测试：`python -m pytest -q`：`173 passed in 3.35s`。
 
+### 2026-06-16
+
+- 确认 Stage 7 定义为 **仿真优先小作业窗口数据试点**：当前还不具备真机接入条件，因此先选择 simulated small job window pilot，而不是假设已有真实 SDK/TCP/DB 接入。
+- Stage 7 关键决策：
+  - 使用 Raw/Clean fixture 模拟一个最小焊接作业窗口，不实现 production connector。
+  - Raw Zone 保留仿真 SDK/TCP JSON、文件、过程记录和事件样貌；Clean Zone 收敛到现有 `weld_workcell` importer contract。
+  - Clean Zone 通过现有 `WeldWorkcellPackageImporter` 进入 Physical AI Package，继续复用 validate、summarize、candidate export、training/evaluation draft 和 Rerun `.rrd` adapter 链路。
+  - 后续真实/脱敏样本到位后，再根据字段、时间、坐标、脱敏、权限和部署缺口决定是否需要 connector skeleton、DB schema、package schema changes，或只演进 importer/清洗流程。
+- Stage 7 新增文件：
+  - `src/physical_ai_data/stage7_sim_window.py`
+  - `scripts/generate_stage7_sim_window.py`
+  - `tests/physical_ai_data/test_stage7_sim_window.py`
+  - `docs/stage7/README.md`
+  - `docs/stage7/sample_request_checklist.md`
+  - `docs/stage7/raw_clean_zone_pilot.md`
+  - `docs/superpowers/specs/2026-06-16-stage-7-simulated-small-job-window-pilot-design.md`
+  - `docs/superpowers/plans/2026-06-16-stage-7-simulated-small-job-window-pilot.md`
+- 本轮入口文档更新：
+  - `README.md`：将当前主线从 Stage 6 更新为 Stage 7，补充 fixture generator、常用命令、Stage 7 推荐阅读、路线规划、边界、文档目录和当前状态。
+  - `details.md`：记录 Stage 7 决策、产出物、验证命令和 Stage 8-oriented 下一步计划。
+- 验证前确认当前 Python editable install 原指向外层仓库，先在本 worktree 运行 `python -m pip install -e ".[dev]"`，随后用户指定的 package chain smoke 可正确解析 `physical_ai_data.stage7_sim_window`。
+- Stage 7 本轮最终验证命令：
+  - `python -m pytest tests/physical_ai_data/test_stage7_sim_window.py -q`：`6 passed in 0.91s`。
+  - `python scripts/generate_stage7_sim_window.py --output-root /tmp/stage7_sim_weld_window --frames 5`：exit 0，生成 `/tmp/stage7_sim_weld_window/raw` 和 `/tmp/stage7_sim_weld_window/clean/weld_workcell`。
+  - package chain smoke：`run_import` 生成 `/tmp/stage7_chain/package`；`validate --json` 返回 `ok: true`、`frame_count: 5`、`event_count: 2`、`label_count: 1`、`metric_count: 30`；`summarize --json`、`export-candidates`、`export-training-draft --split eval` 和 `convert-rerun` 均 exit 0，生成 `/tmp/stage7_chain/package/derived/candidates.csv`、`/tmp/stage7_chain/package/derived/training_eval` 和 `/tmp/stage7_chain/package.rrd`。
+  - `python -m pytest -q`：`179 passed in 3.02s`。
+
 ## 下一步计划
 
-1. 收集真实 SDK/TCP JSON/文件/DB payload 示例。
-2. 确认 AI 控制器 Raw Zone / Clean Zone 存储位置、权限和脱敏边界。
-3. 选择一个最小焊接作业窗口。
-4. 明确时间戳来源、字段单位、坐标系、采样频率和数据保存策略。
-5. 基于真实样本决定后续是否需要 connector skeleton、package schema 扩展、数据库 schema 或只演进 importer/清洗流程。
+1. 用一个真实/脱敏 weld window 替换 Stage 7 simulated Raw Zone。
+2. 评审字段、时间戳、单位、坐标系、采样频率、文件引用和脱敏缺口。
+3. 判断下一步应优先演进 importer/清洗流程，还是进入 connector skeleton、DB/schema 或 package schema changes。
+4. 确认 AI 控制器上的 Raw Zone、Clean Zone、Physical AI Package、Rerun `.rrd` 和 training draft 的存储位置、读写主体、权限边界和保留策略。
 
 ## 维护约定
 
