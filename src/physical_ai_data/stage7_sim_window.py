@@ -18,6 +18,7 @@ PART_ID = "sim_part_001"
 SEAM_ID = "sim_seam_001"
 TASK_NAME = "Stage 7 simulated weld window"
 CREATED_AT = "2026-06-16T00:00:00Z"
+GENERATED_MARKER = ".stage7_sim_window_generated"
 TINY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
@@ -51,9 +52,12 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
 def _prepare_generated_root(root: Path) -> None:
     if root.exists():
         if root.is_dir() and not root.is_symlink():
+            marker = root / GENERATED_MARKER
+            if any(root.iterdir()) and not marker.is_file():
+                raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
             shutil.rmtree(root)
         else:
-            root.unlink()
+            raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
     root.mkdir(parents=True, exist_ok=True)
 
 
@@ -174,6 +178,7 @@ def _write_raw_fixture(raw_root: Path, frames: list[dict[str, str]]) -> None:
             },
         ],
     )
+    _write_text(raw_root / GENERATED_MARKER, "stage7 simulated weld window fixture\n")
 
 
 def _write_clean_fixture(clean_root: Path, frames: list[dict[str, str]]) -> None:
@@ -254,6 +259,7 @@ def _write_clean_fixture(clean_root: Path, frames: list[dict[str, str]]) -> None
         ],
     )
     _write_bytes(clean_root / "images" / "front_0000.png", TINY_PNG)
+    _write_text(clean_root / GENERATED_MARKER, "stage7 simulated weld window fixture\n")
 
 
 def _frames(frame_count: int) -> list[dict[str, str]]:

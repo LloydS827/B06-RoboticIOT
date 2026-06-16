@@ -5,6 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from physical_ai_data.candidates import export_candidates
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.package_io import read_json
@@ -65,6 +67,18 @@ def test_generate_stage7_sim_weld_window_writes_raw_and_clean_fixture(tmp_path: 
         "images/front_0000.png",
     ]:
         assert (result.clean_root / relative_path).is_file()
+
+
+def test_generate_stage7_sim_weld_window_refuses_unknown_existing_raw_dir(tmp_path: Path):
+    fixture_root = tmp_path / "stage7_window"
+    sentinel = fixture_root / "raw" / "keep.txt"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_text("real raw data\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="refusing to overwrite non-stage7 fixture directory"):
+        generate_stage7_sim_weld_window(fixture_root)
+
+    assert sentinel.read_text(encoding="utf-8") == "real raw data\n"
 
 
 def test_stage7_sim_weld_window_runs_weld_workcell_importer_chain(tmp_path: Path):
