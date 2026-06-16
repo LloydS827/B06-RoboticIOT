@@ -81,6 +81,33 @@ def test_generate_stage7_sim_weld_window_refuses_unknown_existing_raw_dir(tmp_pa
     assert sentinel.read_text(encoding="utf-8") == "real raw data\n"
 
 
+def test_generate_stage7_sim_weld_window_refuses_unknown_files_added_to_generated_roots(tmp_path: Path):
+    fixture_root = tmp_path / "stage7_window"
+    result = generate_stage7_sim_weld_window(fixture_root)
+    raw_sentinel = result.raw_root / "keep.txt"
+    clean_sentinel = result.clean_root / "keep.txt"
+    raw_sentinel.write_text("user raw data\n", encoding="utf-8")
+    clean_sentinel.write_text("user clean data\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="refusing to overwrite non-stage7 fixture directory"):
+        generate_stage7_sim_weld_window(fixture_root)
+
+    assert raw_sentinel.read_text(encoding="utf-8") == "user raw data\n"
+    assert clean_sentinel.read_text(encoding="utf-8") == "user clean data\n"
+
+
+def test_generate_stage7_sim_weld_window_can_overwrite_own_generated_roots(tmp_path: Path):
+    fixture_root = tmp_path / "stage7_window"
+    generate_stage7_sim_weld_window(fixture_root, frame_count=5)
+
+    result = generate_stage7_sim_weld_window(fixture_root, frame_count=4)
+
+    raw_manifest = json.loads((result.raw_root / "manifest.raw.json").read_text(encoding="utf-8"))
+    assert raw_manifest["window"]["frame_count"] == 4
+    assert (result.raw_root / ".stage7_sim_window_generated").is_file()
+    assert (result.clean_root / ".stage7_sim_window_generated").is_file()
+
+
 def test_stage7_sim_weld_window_runs_weld_workcell_importer_chain(tmp_path: Path):
     result = generate_stage7_sim_weld_window(tmp_path)
     package_root = tmp_path / "package"

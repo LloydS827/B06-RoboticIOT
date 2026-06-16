@@ -19,6 +19,24 @@ SEAM_ID = "sim_seam_001"
 TASK_NAME = "Stage 7 simulated weld window"
 CREATED_AT = "2026-06-16T00:00:00Z"
 GENERATED_MARKER = ".stage7_sim_window_generated"
+RAW_TOP_LEVEL_ENTRIES = {
+    GENERATED_MARKER,
+    "manifest.raw.json",
+    "sdk",
+    "tcp_json",
+    "files",
+    "process",
+    "events",
+}
+CLEAN_TOP_LEVEL_ENTRIES = {
+    GENERATED_MARKER,
+    "job.json",
+    "frames.csv",
+    "process.csv",
+    "events.csv",
+    "review_labels.csv",
+    "images",
+}
 TINY_PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII="
 )
@@ -40,8 +58,10 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
     clean_root = root / "clean" / "weld_workcell"
     result = Stage7SimWindowResult(root=root, raw_root=raw_root, clean_root=clean_root)
 
-    _prepare_generated_root(raw_root)
-    _prepare_generated_root(clean_root)
+    _prepare_generated_roots(
+        (raw_root, RAW_TOP_LEVEL_ENTRIES),
+        (clean_root, CLEAN_TOP_LEVEL_ENTRIES),
+    )
     frames = _frames(frame_count)
 
     _write_raw_fixture(raw_root, frames)
@@ -49,15 +69,28 @@ def generate_stage7_sim_weld_window(output_root: str | Path, frame_count: int = 
     return result
 
 
-def _prepare_generated_root(root: Path) -> None:
+def _prepare_generated_roots(*roots: tuple[Path, set[str]]) -> None:
+    for root, allowed_entries in roots:
+        _validate_generated_root(root, allowed_entries)
+    for root, _allowed_entries in roots:
+        _reset_generated_root(root)
+
+
+def _validate_generated_root(root: Path, allowed_entries: set[str]) -> None:
     if root.exists():
         if root.is_dir() and not root.is_symlink():
-            marker = root / GENERATED_MARKER
-            if any(root.iterdir()) and not marker.is_file():
+            entries = {entry.name for entry in root.iterdir()}
+            if not entries:
+                return
+            if GENERATED_MARKER not in entries or entries - allowed_entries:
                 raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
-            shutil.rmtree(root)
         else:
             raise ValueError(f"refusing to overwrite non-stage7 fixture directory: {root}")
+
+
+def _reset_generated_root(root: Path) -> None:
+    if root.exists():
+        shutil.rmtree(root)
     root.mkdir(parents=True, exist_ok=True)
 
 
