@@ -83,7 +83,7 @@ artifacts/stage8/h300_synthetic_demo/
     review_labels.csv
     images/front_0000.png
   package/                                 # 本地生成 artifact，默认不提交
-    manifest.json
+    physical_ai_manifest.json
     ...
   package.rrd                              # 本地 Rerun replay artifact，默认不提交
 ```
