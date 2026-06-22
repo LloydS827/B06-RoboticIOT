@@ -182,12 +182,26 @@
   - package chain smoke：`run_import` 生成 `/tmp/stage7_chain/package`；`validate --json` 返回 `ok: true`、`frame_count: 5`、`event_count: 2`、`label_count: 1`、`metric_count: 30`；`summarize --json`、`export-candidates`、`export-training-draft --split eval` 和 `convert-rerun` 均 exit 0，生成 `/tmp/stage7_chain/package/derived/candidates.csv`、`/tmp/stage7_chain/package/derived/training_eval` 和 `/tmp/stage7_chain/package.rrd`。
   - `python -m pytest -q`：`180 passed in 2.96s`。
 
+### 2026-06-22
+
+- 完成 Stage 7.1 战略重定位：B06 从历史性的 Rerun/Robotic IOT 阶段叙述收束为 **工业物理 AI 数据层**，定位为公司在机器人、智能工站、设备时序和系统级协同项目中的横向数据底座。
+- 确认 Stage 7.1 决策：当前第一样板是 A01 H300 最小焊接作业窗口数据试点；当前仍没有真机接入条件，因此 simulated Raw/Clean fixture 继续作为默认可运行路径，不声称已有真实 H300 数据。
+- 更新 README 首页结构：按项目定位、主链路、当前第一样板、当前可用能力、四类项目 profile、工程对接方式、当前边界、快速开始/常用命令组织，并保留历史阶段路线和文档目录在后半部分。
+- 明确主链路为共享上游与 profile-specific consumption：Raw Zone -> Clean Zone -> Physical AI Package -> Rerun 回放 -> candidate sample export -> training/evaluation draft；A01、A02、B08、S01 分别消费 job-window evidence、`ManipulationSkillAsset` evidence handoff、timeseries observation candidates/result references 和 manufacturing event context/evidence references。
+- 新增并索引 profile docs：`docs/profiles/README.md`、`docs/profiles/a01_weld_workcell_job_window.md`、`docs/profiles/a02_manipulation_skill_asset_evidence.md`、`docs/profiles/b08_equipment_timeseries_observation_package.md`、`docs/profiles/s01_manufacturing_event_context_package.md` 和 `docs/profiles/b06_to_a02_evidence_handoff.md`。
+- 完成 A01 H300 sample request 与 field alignment 文档收敛：`docs/stage7/sample_request_checklist.md` 明确真实/脱敏样本请求，`docs/stage7/h300_weld_workcell_field_alignment.md` 说明 H300 字段如何对齐 `weld_workcell` Clean contract。
+- 完成 B06 -> A02 handoff 口径：A01 作业窗口中的已确认轨迹、TCP/路径点、质量标签、专家审查、失败边界等可作为 A02 `ManipulationSkillAsset` 候选 evidence；大体量点云、图像、日志和敏感现场文件默认作为上下文或附件引用，不自动进入技能资产核心字段。
+- 明确真实/脱敏/仿真/临时 artifact/不可提交数据边界：真实数据不直接提交仓库，脱敏数据需确认可提交边界，仿真数据作为默认可运行样本，临时 artifact 放在 `artifacts/` 或 `/tmp`，客户现场原始文件、未脱敏图像/点云、账号密钥、内部网络地址、权限配置和商业敏感字段不可提交。
+- 明确当前仍不做生产 connector、不做通用 IoT 平台、不新增 TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema 或 Physical AI Package schema changes。
+- 验证结果：待最终验证补记。
+
 ## 下一步计划
 
-1. 用一个真实/脱敏 weld window 替换 Stage 7 simulated Raw Zone。
-2. 评审字段、时间戳、单位、坐标系、采样频率、文件引用和脱敏缺口。
-3. 判断下一步应优先演进 importer/清洗流程，还是进入 connector skeleton、DB/schema 或 package schema changes。
-4. 确认 AI 控制器上的 Raw Zone、Clean Zone、Physical AI Package、Rerun `.rrd` 和 training draft 的存储位置、读写主体、权限边界和保留策略。
+1. Stage 8 用真实/脱敏 A01 H300 最小窗口替换 Stage 7.1 simulated Raw Zone，确认样本能否覆盖 `weld_workcell_job_window` 的最小字段组。
+2. 评审 H300 字段、时间戳、单位、坐标系、采样频率、文件引用、权限、脱敏边界和质量结果来源。
+3. 确认 AI 控制器上的 Raw Zone、Clean Zone、Physical AI Package、Rerun `.rrd`、candidate export 和 training/evaluation draft 的存储位置、读写主体、权限边界和保留策略。
+4. 基于真实/脱敏样本决定 importer/清洗流程是否需要演进，是否需要 connector skeleton、DB/schema 或 Physical AI Package schema changes。
+5. 将确认后的 A01 H300 evidence 交给 A02 `ManipulationSkillAsset` 候选流程，区分可进入技能资产的 evidence、只作为上下文的字段和只能作为附件引用的大体量 artifact。
 
 ## 维护约定
 
