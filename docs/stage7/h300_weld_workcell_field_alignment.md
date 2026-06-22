@@ -8,45 +8,49 @@
 
 ## 现有输入 contract
 
-`WeldWorkcellPackageImporter` 当前从 Clean Zone 读取以下文件：
+`WeldWorkcellPackageImporter` 当前只结构化读取现有 `weld_workcell` contract 中的有限字段。H300 新字段可以先随 source artifact 保留，但不能被理解为已经进入 importer 的结构化字段。
 
-- `job.json`：作业窗口上下文、工单/任务/工件/焊缝 ID、设备引用、时间范围和 source artifact。
-- `frames.csv`：按时间排列的机器人位姿、相机位姿/标定引用、图像引用和点云引用。
-- `process.csv`：焊接电流、电压、速度、送丝、气体、工艺参数和质量结果。
-- `events.csv`：执行事件、阶段切换、异常、报警和外部日志摘要。
-- `review_labels.csv`：模型输出、人工修正、人工复核标签和质量评审标签。
-- `images/`：相对路径引用的图像文件；点云、PCL 输出和模型输出可先作为 source artifact 引用。
+当前结构化输入如下：
+
+- `job.json` 必需字段：`work_order_id`、`station_id`、`robot_id`、`welder_id`、`part_id`、`seam_id`、`task_name`、`created_at`。
+- `frames.csv` 必需列：`timestamp_s`、`phase`、`tcp_x`、`tcp_y`、`tcp_z`、`tcp_qx`、`tcp_qy`、`tcp_qz`、`tcp_qw`、`image_path`。
+- `process.csv` 必需列：`timestamp_s`、`weld_current_a`、`weld_voltage_v`、`wire_feed_mpm`、`gas_flow_lpm`、`travel_speed_mm_s`、`defect_probability`。
+- `events.csv` 必需列：`timestamp_s`、`event_type`、`severity`、`message`、`object_id`。
+- `review_labels.csv` 可选列：`timestamp_s`、`label_type`、`value`、`confidence`。
+- `images/`：只通过 `frames.csv.image_path` 引用图片；当前 importer 不读取点云、相机位姿/标定、PCL 文件或模型输出文件。
 
 ## H300 到 Clean Contract 对齐表
 
-| H300 字段或样本 | Clean Zone 落点 | 说明 |
+| H300 字段或样本 | 当前落点 | 当前处理 |
 | --- | --- | --- |
-| `job_window_id` | `job.json` | H300 最小窗口主键；真实样本后确认命名规则。 |
-| `work_order_id` | `job.json` | 工单或脱敏工单 ID。 |
-| `task_id` | `job.json` | 作业任务 ID，可同时保留任务阶段。 |
-| `part_id` | `job.json` | 工件引用。 |
-| `seam_id` | `job.json` | 焊缝引用，焊缝几何可通过 source artifact 指向原始文件。 |
-| 3-10 秒窗口 | `job.json` | 记录 start/end time、时间戳来源和单位。 |
-| 点云引用 | `frames.csv` | 使用相对路径；真实点云先留在受控存储或 source artifact。 |
-| 图像引用 | `frames.csv`、`images/` | 小体量脱敏图片可进入 images；未脱敏真实图片不可提交。 |
-| 机器人位姿 | `frames.csv` | TCP 或关节位姿，统一时间单位为秒。 |
-| 相机位姿/标定 | `frames.csv`、source artifact | 位姿可按帧记录，标定文件先作为 source artifact 引用。 |
-| 路径点 | `frames.csv`、source artifact | 关键路径点可落帧表，完整 trajectory 保留 source artifact。 |
-| PCL 输出 | `review_labels.csv`、source artifact | 焊缝候选、坡口/边界识别或点云特征先保留引用。 |
-| 模型输出 | `review_labels.csv`、source artifact | 记录模型版本、输入引用、输出和置信度。 |
-| 人工修正 | `review_labels.csv` | 记录修正类型、修正值、原因和脱敏复核人标识。 |
-| 工艺参数 | `process.csv` | 电流、电压、速度、送丝、气体、摆动、压力等。 |
-| 执行事件/异常/报警 | `events.csv` | 阶段切换、执行日志、异常代码、报警和人工处理记录。 |
-| 质量结果 | `process.csv`、`review_labels.csv` | 数值过程质量落 `process.csv`；人工质量评审落 `review_labels.csv`。 |
+| `work_order_id` | `job.json.work_order_id` | 已结构化读取。 |
+| `part_id` | `job.json.part_id` | 已结构化读取。 |
+| `seam_id` | `job.json.seam_id` | 已结构化读取；焊缝几何暂留 source artifact。 |
+| H300 工位/设备引用 | `job.json.station_id`、`robot_id`、`welder_id` | 已结构化读取到现有设备字段。 |
+| 任务名称/阶段 | `job.json.task_name`、`frames.csv.phase` | `task_id` 暂不结构化读取，可留 source artifact。 |
+| 机器人 TCP 位姿 | `frames.csv` 必需 TCP 列 | 已结构化读取；完整 trajectory 作为 source artifact。 |
+| 图像引用 | `frames.csv.image_path`、`images/` | 已支持相对路径引用和可选复制。 |
+| 工艺参数 | `process.csv` 现有必需列 | 已映射为 package metrics；H300 额外工艺参数暂留 source artifact。 |
+| 执行事件/异常/报警 | `events.csv` | 已结构化读取现有事件列。 |
+| 人工复核标签 | `review_labels.csv` | 已结构化读取 label 类型、值和置信度；复核人/状态暂留 source artifact。 |
+| `job_window_id` | source artifact | 当前不在 `job.json` 必需字段中；真实样本后决定是否结构化。 |
+| `task_id` | source artifact | 当前不在 `job.json` 必需字段中；真实样本后决定是否结构化。 |
+| 点云引用 | source artifact | 当前 importer 不读取 `point_cloud_ref`；真实样本后决定是否扩展清洗流程或 package schema。 |
+| 相机位姿/标定 | source artifact | 当前 importer 不读取相机位姿或标定文件；先保留引用和版本。 |
+| 路径点/规划路径/修正路径 | `frames.csv` TCP 摘要 + source artifact | 当前只结构化读取每帧 TCP；完整路径文件先保留。 |
+| PCL 输出 | source artifact | 当前不结构化读取；可在评审记录中摘要，不写成已支持列。 |
+| 模型输出 | source artifact 或 `review_labels.csv` 摘要 | 只有人工确认后的摘要可进入 label；完整模型输出暂留 source artifact。 |
+| 质量结果 | `process.csv.defect_probability` 或 `review_labels.csv` | 过程质量概率和人工标签可结构化；完整质检报告暂留 source artifact。 |
 
 ## Gap Decision Table
 
 | Gap | 默认决策 | 何时再决策 |
 | --- | --- | --- |
 | H300 真实字段名未知 | 先用 simulated fixture 字段和 profile 名称占位 | 拿到真实或脱敏样本后映射。 |
+| `job_window_id`、`task_id` 是否需要结构化 | 先留 source artifact | 真实样本证明它们是跨包追溯主键时再扩展 importer。 |
 | 点云/PCL 输出格式未知 | 先作为 source artifact 引用 | 真实样本证明需要按帧结构化时再扩展清洗流程。 |
-| 相机标定结构未知 | 先在 source artifact 中保留文件引用和版本 | 标定文件稳定后再决定是否写入 `frames.csv` 固定列。 |
-| 模型输出字段未知 | 先落 `review_labels.csv` 摘要和 source artifact | 模型版本、置信度和输出类型稳定后再细化列。 |
+| 相机标定结构未知 | 先在 source artifact 中保留文件引用和版本 | 标定文件稳定后再决定是否新增清洗字段或 package artifact 约定。 |
+| 模型输出字段未知 | 先保留 source artifact，必要时写人工确认后的 label 摘要 | 模型版本、置信度和输出类型稳定后再细化列。 |
 | 人工修正来源未知 | 先按 review label 记录 | 现场复核工具稳定后再决定清洗格式。 |
 | 质量结果来源未知 | 先区分过程质量和人工质量评审 | 真实质检口径稳定后再决定落 `process.csv` 或 `review_labels.csv`。 |
 | 需要在线接入 | 暂不实现生产 connector | 只有真实样本证明 SDK/TCP/DB 稳定且必要时再立项。 |
@@ -54,4 +58,4 @@
 
 ## 当前结论
 
-A01 H300 的第一轮工作应保持在 Raw/Clean/importer 链路内：`job.json` 承载窗口上下文，`frames.csv` 承载时序位姿和图像/点云引用，`process.csv` 承载工艺参数和过程质量，`events.csv` 承载执行事件/异常/报警，`review_labels.csv` 承载模型输出、人工修正和质量评审。真实样本后再决策，不把 simulated payload 当成现场协议，也不提交未脱敏真实数据。
+A01 H300 的第一轮工作应保持在 Raw/Clean/importer 链路内，但要区分当前已结构化读取的 clean contract 和暂存的 H300 扩展语义：`job.json`、`frames.csv`、`process.csv`、`events.csv`、`review_labels.csv` 先满足现有 importer 必需字段；`job_window_id`、点云、相机标定、PCL、模型输出和完整路径文件先作为 source artifact 或评审摘要保留。真实样本后再决策，不把 simulated payload 当成现场协议，也不提交未脱敏真实数据。
