@@ -278,7 +278,7 @@ git commit -m "feat: add Stage 8 H300 synthetic demo fixture"
 - Create: `docs/stage8/h300_synthetic_to_real_gap_register.md`
 - Create: `docs/stage8/a02_evidence_demo_example.md`
 
-- [ ] **Step 1: Create Stage 8 README**
+- [x] **Step 1: Create Stage 8 README**
 
 Document:
 
@@ -321,7 +321,7 @@ python scripts/physical_ai_package.py convert-rerun artifacts/stage8/h300_synthe
 
 - Boundaries: synthetic only, not production connector, no DB/schema/package schema changes.
 
-- [ ] **Step 2: Create visualization report**
+- [x] **Step 2: Create visualization report**
 
 Include:
 
@@ -331,7 +331,7 @@ Include:
 - Raw/Clean/Package file tree.
 - Status board: current capability / needs real data / explicitly not doing.
 
-- [ ] **Step 3: Create gap register**
+- [x] **Step 3: Create gap register**
 
 Use a Markdown table with columns:
 
@@ -341,7 +341,7 @@ Gap ID | Field/sample group | Stage 8 status | Current landing | Needed real/de-
 
 Cover at least: job/task ids, robot state timing, point cloud/PCL, camera calibration, model outputs, manual corrections, process params, events/alarms, quality result, AI controller storage/permissions.
 
-- [ ] **Step 4: Create A02 evidence handoff example**
+- [x] **Step 4: Create A02 evidence handoff example**
 
 Include `synthetic_demo_only: true`, and sections/tables for:
 
@@ -352,7 +352,7 @@ Include `synthetic_demo_only: true`, and sections/tables for:
 
 Avoid defining an A02 schema or automatic converter.
 
-- [ ] **Step 5: Run documentation scans**
+- [x] **Step 5: Run documentation scans**
 
 Run:
 
@@ -370,7 +370,7 @@ rg -n "已接入真实 H300|真实 H300 样本已到位|H300 现场协议已定�
 
 Expected: exit 1, no hits.
 
-- [ ] **Step 6: Commit Task 2**
+- [x] **Step 6: Commit Task 2**
 
 ```bash
 git add docs/stage8
