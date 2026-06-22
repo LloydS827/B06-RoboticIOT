@@ -12,29 +12,29 @@
 
 ## File Structure
 
-- Create: `docs/profiles/README.md`  
+- Create: `docs/profiles/README.md`
   Profile 总览、阅读顺序、共同边界、数据分级。
-- Create: `docs/profiles/a01_weld_workcell_job_window.md`  
+- Create: `docs/profiles/a01_weld_workcell_job_window.md`
   A01 H300 最小焊接作业窗口 profile contract。
-- Create: `docs/profiles/a02_manipulation_skill_asset_evidence.md`  
+- Create: `docs/profiles/a02_manipulation_skill_asset_evidence.md`
   A02 `ManipulationSkillAsset` evidence profile contract。
-- Create: `docs/profiles/b08_equipment_timeseries_observation_package.md`  
+- Create: `docs/profiles/b08_equipment_timeseries_observation_package.md`
   B08 设备时序观测 profile contract。
-- Create: `docs/profiles/s01_manufacturing_event_context_package.md`  
+- Create: `docs/profiles/s01_manufacturing_event_context_package.md`
   S01 制造事件上下文 profile contract。
-- Create: `docs/profiles/b06_to_a02_evidence_handoff.md`  
+- Create: `docs/profiles/b06_to_a02_evidence_handoff.md`
   B06 到 A02 evidence handoff，区分 evidence、context、attachment。
-- Create: `docs/stage7/h300_weld_workcell_field_alignment.md`  
+- Create: `docs/stage7/h300_weld_workcell_field_alignment.md`
   A01 H300 字段与现有 `WeldWorkcellPackageImporter` clean contract 的对齐表。
-- Modify: `docs/stage7/README.md`  
+- Modify: `docs/stage7/README.md`
   将 Stage 7 从通用仿真小窗口收束为 A01 H300 最小作业窗口数据试点。
-- Modify: `docs/stage7/sample_request_checklist.md`  
+- Modify: `docs/stage7/sample_request_checklist.md`
   补齐 A01 H300 第一批样本请求清单。
-- Modify: `docs/stage7/raw_clean_zone_pilot.md`  
+- Modify: `docs/stage7/raw_clean_zone_pilot.md`
   强化 A01 H300 Raw/Clean Zone、真实/脱敏/仿真/临时 artifact 边界。
-- Modify: `README.md`  
+- Modify: `README.md`
   首页重排为工业物理 AI 数据层入口，并索引四类 profile。
-- Modify: `details.md`  
+- Modify: `details.md`
   记录 Stage 7.1 决策、产出物、验证和 Stage 8 下一步。
 
 ## Success Criteria
