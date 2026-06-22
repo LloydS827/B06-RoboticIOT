@@ -292,7 +292,7 @@ python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/st
 - Minimal Clean Zone -> Package Python example:
 
 ```bash
-python - <<'PY'
+PYTHONPATH=src python - <<'PY'
 from pathlib import Path
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.weld_workcell_importer import WeldWorkcellPackageImporter
@@ -418,7 +418,7 @@ Run:
 ```bash
 rm -rf /tmp/stage8_h300_demo /tmp/stage8_h300_package /tmp/stage8_h300_package.rrd
 python scripts/generate_stage8_h300_synthetic_demo.py --output-root /tmp/stage8_h300_demo --frames 5
-python - <<'PY'
+PYTHONPATH=src python - <<'PY'
 from pathlib import Path
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.weld_workcell_importer import WeldWorkcellPackageImporter
