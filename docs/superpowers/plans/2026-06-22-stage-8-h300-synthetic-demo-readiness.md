@@ -362,13 +362,9 @@ rg -n "Stage 8|synthetic|gap register|A02 evidence handoff|Raw Zone|Clean Zone" 
 
 Expected: exit 0 with hits in all Stage 8 docs.
 
-Run:
+Run the Task 2 false-claim scan against `docs/stage8`.
 
-```bash
-rg -n "已接入真实 H300|真实 H300 样本已到位|H300 现场协议已定义|生产 connector 已实现|DB ingestion 已完成|正式 DB schema 已完成|Physical AI Package schema 已扩展|A02 schema 已定义|自动转换 A02 技能资产" docs/stage8
-```
-
-Expected: exit 1, no hits.
+Expected: exit 1, no hits. Do not write the full sensitive phrase list into this plan, because the final recursive `rg` scan includes plan files and would otherwise match the checklist text itself.
 
 - [x] **Step 6: Commit Task 2**
 
@@ -385,7 +381,7 @@ git commit -m "docs: add Stage 8 capability and readiness package"
 - Modify: `docs/stage7/README.md`
 - Modify: `docs/superpowers/plans/2026-06-22-stage-8-h300-synthetic-demo-readiness.md`
 
-- [ ] **Step 1: Update README**
+- [x] **Step 1: Update README**
 
 Update project-level entry points:
 
@@ -396,7 +392,7 @@ Update project-level entry points:
 - Route adds Stage 8 and shifts real/de-identified sample replacement to Stage 9 or post-Stage 8 review.
 - Docs index adds Stage 8 spec, plan, and docs.
 
-- [ ] **Step 2: Update details**
+- [x] **Step 2: Update details**
 
 Add a 2026-06-22 Stage 8 section recording:
 
@@ -407,7 +403,7 @@ Add a 2026-06-22 Stage 8 section recording:
 
 Update next-step plan to real/de-identified H300 sample replacement and gap register closure.
 
-- [ ] **Step 3: Update Stage 7 README transition**
+- [x] **Step 3: Update Stage 7 README transition**
 
 Add or revise “下一步” to say:
 
@@ -415,7 +411,7 @@ Add or revise “下一步” to say:
 - Stage 8 is the second synthetic H300-oriented demo/readiness package while real samples are unavailable.
 - Real/de-identified sample replacement is the next stage after Stage 8.
 
-- [ ] **Step 4: Run full Stage 8 chain smoke**
+- [x] **Step 4: Run full Stage 8 chain smoke**
 
 Run:
 
@@ -446,7 +442,18 @@ python scripts/physical_ai_package.py convert-rerun /tmp/stage8_h300_package --o
 
 Expected: every command exits 0; package validates with `ok: true`; candidates, training draft, and `.rrd` are created.
 
-- [ ] **Step 5: Run targeted and full tests**
+Result:
+
+- `rm -rf /tmp/stage8_h300_demo /tmp/stage8_h300_package /tmp/stage8_h300_package.rrd`: exit 0.
+- `python scripts/generate_stage8_h300_synthetic_demo.py --output-root /tmp/stage8_h300_demo --frames 5`: exit 0.
+- `PYTHONPATH=src python - <<'PY' ... run_import(...) ... PY`: exit 0.
+- `python scripts/physical_ai_package.py validate /tmp/stage8_h300_package --json`: exit 0 with `ok: true`, `frame_count: 5`, `event_count: 2`, `label_count: 1`, `metric_count: 30`, `artifact_ref_count: 7`.
+- `python scripts/physical_ai_package.py summarize /tmp/stage8_h300_package --json`: exit 0.
+- `python scripts/physical_ai_package.py export-candidates /tmp/stage8_h300_package`: exit 0; wrote `/tmp/stage8_h300_package/derived/candidates.csv`.
+- `python scripts/physical_ai_package.py export-training-draft /tmp/stage8_h300_package --split eval`: exit 0; wrote `/tmp/stage8_h300_package/derived/training_eval`.
+- `python scripts/physical_ai_package.py convert-rerun /tmp/stage8_h300_package --output-rrd /tmp/stage8_h300_package.rrd`: exit 0; wrote `/tmp/stage8_h300_package.rrd`.
+
+- [x] **Step 5: Run targeted and full tests**
 
 Run:
 
@@ -457,25 +464,32 @@ python -m pytest -q
 
 Expected: targeted tests pass; full suite passes.
 
-- [ ] **Step 6: Run final keyword and false-claim scans**
+Result:
+
+- `python -m pytest tests/physical_ai_data/test_stage8_h300_demo.py -q`: `7 passed in 0.62s`.
+- `python -m pytest -q`: `187 passed in 3.00s`.
+
+- [x] **Step 6: Run final keyword and false-claim scans**
 
 Run:
 
 ```bash
-rg -n "Stage 8|H300 synthetic|synthetic-to-real|gap register|A02 evidence handoff|generate_stage8_h300_synthetic_demo" README.md details.md docs/stage7 docs/stage8 docs/superpowers/specs docs/superpowers/plans
+rg -n "Stage 8|H300 synthetic|synthetic-to-real|gap register|A02 evidence handoff|generate_stage8_h300_synthetic_demo" README.md details.md docs/stage7 docs/stage8 docs/superpowers/specs/2026-06-22-stage-8-h300-synthetic-demo-readiness-design.md docs/superpowers/plans/2026-06-22-stage-8-h300-synthetic-demo-readiness.md
 ```
 
 Expected: exit 0 with hits across README, details, Stage 8 docs, spec, and plan.
 
-Run:
-
-```bash
-rg -n "已接入真实 H300|真实 H300 样本已到位|H300 现场协议已定义|生产 connector 已实现|DB ingestion 已完成|正式 DB schema 已完成|Physical AI Package schema 已扩展|A02 schema 已定义|自动转换 A02 技能资产" README.md details.md docs/stage7 docs/stage8 docs/superpowers/specs docs/superpowers/plans
-```
+Run the Stage 8 false-claim scan against the same Stage 8 scope. The forbidden phrase list comes from this task's acceptance criteria and should stay outside this plan body to avoid self-matching.
 
 Expected: exit 1, no hits.
 
-- [ ] **Step 7: Commit Task 3**
+Result:
+
+- Initial full historical recursive false-claim scan hit an old scan command in the Stage 7.1 plan, not a Stage 8 real-data claim.
+- Stage 8 scoped keyword scan: exit 0 with hits across README, details, Stage 7/8 docs, Stage 8 spec, and Stage 8 plan.
+- Stage 8 scoped false-claim scan: exit 1, no hits.
+
+- [x] **Step 7: Commit Task 3**
 
 ```bash
 git add README.md details.md docs/stage7/README.md docs/superpowers/plans/2026-06-22-stage-8-h300-synthetic-demo-readiness.md

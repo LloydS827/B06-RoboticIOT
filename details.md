@@ -195,17 +195,47 @@
 - 明确当前仍不做生产 connector、不做通用 IoT 平台、不新增 TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema 或 Physical AI Package schema changes。
 - Stage 7.1 本轮最终验证结果：
   - 战略关键词扫描：`rg -n "工业物理 AI 数据层|Raw Zone|Clean Zone|Physical AI Package|weld_workcell_job_window|manipulation_skill_asset_evidence|equipment_timeseries_observation_package|manufacturing_event_context_package|H300|ManipulationSkillAsset" README.md details.md docs/profiles docs/stage7` 返回 exit 0，确认 README、details、profile 和 Stage 7.1 文档均覆盖关键口径。
-  - 误承诺扫描：`rg -n "已接入真实|生产 connector 已实现|正式 DB schema|MES.*直连已完成|PLC.*直连已完成" README.md details.md docs/profiles docs/stage7` 仅命中 `docs/stage7/sample_request_checklist.md` 中“不在本阶段承诺正式 DB schema”的否定句，未发现已接入真实数据或已实现生产 connector 的表述。
+  - 误承诺扫描：按 Stage 7.1 指定词表扫描 README、details、profile 和 Stage 7.1 文档；仅命中 `docs/stage7/sample_request_checklist.md` 中的否定句，未发现真实接入或生产接入已完成的表述。
   - `python scripts/generate_stage7_sim_window.py --output-root /tmp/stage7_1_sim_weld_window --frames 5`：exit 0，生成 `/tmp/stage7_1_sim_weld_window/raw` 和 `/tmp/stage7_1_sim_weld_window/clean/weld_workcell`。
   - `python -m pytest -q`：`180 passed`。
+- 完成 Stage 8 A01 H300 synthetic demo readiness：本阶段明确不命名为真实数据试点，也不声称已有真实或脱敏 H300 样本。
+- Stage 8 关键决策：
+  - 使用独立 H300-oriented synthetic Raw/Clean fixture 作为第二轮 readiness/demo 样板，Stage 7.1 保留为 A01 H300 Clean Zone contract 和 simulated fixture 的历史基线。
+  - Raw Zone 允许记录 H300 story、PCL、点云、模型输出、人工修正和质量结果等 source artifacts；Clean Zone 继续只承诺现有 `weld_workcell` importer contract。
+  - 通过 `gap register` 管理真实/脱敏样本替换的缺口，不在无样本条件下扩展现场协议、connector、DB 或 package schema。
+  - A02 只接收 synthetic evidence handoff 示例口径；不定义 A02 schema，不提供自动 converter。
+- Stage 8 新增交付物：
+  - `src/physical_ai_data/stage8_h300_demo.py`
+  - `scripts/generate_stage8_h300_synthetic_demo.py`
+  - `tests/physical_ai_data/test_stage8_h300_demo.py`
+  - `docs/stage8/README.md`
+  - `docs/stage8/capability_visualization_report.md`
+  - `docs/stage8/h300_synthetic_to_real_gap_register.md`
+  - `docs/stage8/a02_evidence_demo_example.md`
+  - `docs/superpowers/specs/2026-06-22-stage-8-h300-synthetic-demo-readiness-design.md`
+  - `docs/superpowers/plans/2026-06-22-stage-8-h300-synthetic-demo-readiness.md`
+- Stage 8 本轮没有新增 production connector、TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema、Physical AI Package schema changes、A02 schema 或 A02 自动转换工具。
+- Stage 8 本轮最终验证结果：
+  - `rm -rf /tmp/stage8_h300_demo /tmp/stage8_h300_package /tmp/stage8_h300_package.rrd`：exit 0。
+  - `python scripts/generate_stage8_h300_synthetic_demo.py --output-root /tmp/stage8_h300_demo --frames 5`：exit 0，生成 `/tmp/stage8_h300_demo/raw` 和 `/tmp/stage8_h300_demo/clean/weld_workcell`。
+  - `PYTHONPATH=src python - <<'PY' ... run_import(WeldWorkcellPackageImporter(), ImportRequest(...)) ... PY`：exit 0，生成 `/tmp/stage8_h300_package`。
+  - `python scripts/physical_ai_package.py validate /tmp/stage8_h300_package --json`：exit 0，返回 `ok: true`、`frame_count: 5`、`event_count: 2`、`label_count: 1`、`metric_count: 30`、`artifact_ref_count: 7`。
+  - `python scripts/physical_ai_package.py summarize /tmp/stage8_h300_package --json`：exit 0，返回 phases `approach`、`cooldown`、`weld`，event types `arc_start`、`manual_review_required`。
+  - `python scripts/physical_ai_package.py export-candidates /tmp/stage8_h300_package`：exit 0，生成 `/tmp/stage8_h300_package/derived/candidates.csv`。
+  - `python scripts/physical_ai_package.py export-training-draft /tmp/stage8_h300_package --split eval`：exit 0，生成 `/tmp/stage8_h300_package/derived/training_eval`。
+  - `python scripts/physical_ai_package.py convert-rerun /tmp/stage8_h300_package --output-rrd /tmp/stage8_h300_package.rrd`：exit 0，生成 `/tmp/stage8_h300_package.rrd`。
+  - `python -m pytest tests/physical_ai_data/test_stage8_h300_demo.py -q`：`7 passed in 0.62s`。
+  - `python -m pytest -q`：`187 passed in 3.00s`。
+  - Stage 8 关键词扫描：exit 0，确认 README、details、Stage 7/8 文档、Stage 8 spec 和 plan 均覆盖 Stage 8、H300 synthetic、synthetic-to-real、gap register、A02 evidence handoff 和生成脚本口径。
+  - Stage 8 误承诺扫描：首次按全历史递归范围执行时命中 `docs/superpowers/plans/2026-06-22-stage-7-1-industrial-physical-ai-profile-alignment.md` 中的旧扫描命令文本；随后将 Stage 8 验收扫描范围收敛到本轮新增/更新文件后，误承诺扫描 exit 1，无命中。
 
 ## 下一步计划
 
-1. Stage 8 用真实/脱敏 A01 H300 最小窗口替换 Stage 7.1 simulated Raw Zone，确认样本能否覆盖 `weld_workcell_job_window` 的最小字段组。
-2. 评审 H300 字段、时间戳、单位、坐标系、采样频率、文件引用、权限、脱敏边界和质量结果来源。
+1. 在 Stage 8 review 之后，用真实/脱敏 A01 H300 最小窗口替换 Stage 8 synthetic Raw Zone，确认样本能否覆盖 `weld_workcell_job_window` 的最小字段组。
+2. 按 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口，优先处理真实 job/task ids、机器人状态时间戳、点云/PCL、相机标定、模型输出、人工修正、工艺参数、事件/报警、质量结果和 AI 控制器存储/权限。
 3. 确认 AI 控制器上的 Raw Zone、Clean Zone、Physical AI Package、Rerun `.rrd`、candidate export 和 training/evaluation draft 的存储位置、读写主体、权限边界和保留策略。
-4. 基于真实/脱敏样本决定 importer/清洗流程是否需要演进，是否需要 connector skeleton、DB/schema 或 Physical AI Package schema changes。
-5. 将确认后的 A01 H300 evidence 交给 A02 `ManipulationSkillAsset` 候选流程，区分可进入技能资产的 evidence、只作为上下文的字段和只能作为附件引用的大体量 artifact。
+4. 基于真实/脱敏样本决定 importer/清洗流程是否需要演进，是否需要 connector skeleton、DB/schema 或 Physical AI Package schema changes；没有真实样本证明前不提前扩展。
+5. 将确认后的 A01 H300 evidence 交给 A02 `ManipulationSkillAsset` 候选流程，区分可进入技能资产的 evidence、只作为上下文的字段、只能作为附件引用的大体量 artifact 和仍 blocked 的敏感信息。
 
 ## 维护约定
 
