@@ -34,7 +34,7 @@ Raw Zone 中的 H300 story、PCL、模型输出、人工修正和质量结果是
 ## Clean Zone -> Package Python 示例
 
 ```bash
-python - <<'PY'
+PYTHONPATH=src python - <<'PY'
 from pathlib import Path
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.weld_workcell_importer import WeldWorkcellPackageImporter
