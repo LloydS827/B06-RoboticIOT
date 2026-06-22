@@ -193,7 +193,11 @@
 - 完成 B06 -> A02 handoff 口径：A01 作业窗口中的已确认轨迹、TCP/路径点、质量标签、专家审查、失败边界等可作为 A02 `ManipulationSkillAsset` 候选 evidence；大体量点云、图像、日志和敏感现场文件默认作为上下文或附件引用，不自动进入技能资产核心字段。
 - 明确真实/脱敏/仿真/临时 artifact/不可提交数据边界：真实数据不直接提交仓库，脱敏数据需确认可提交边界，仿真数据作为默认可运行样本，临时 artifact 放在 `artifacts/` 或 `/tmp`，客户现场原始文件、未脱敏图像/点云、账号密钥、内部网络地址、权限配置和商业敏感字段不可提交。
 - 明确当前仍不做生产 connector、不做通用 IoT 平台、不新增 TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema 或 Physical AI Package schema changes。
-- 验证结果：待最终验证补记。
+- Stage 7.1 本轮最终验证结果：
+  - 战略关键词扫描：`rg -n "工业物理 AI 数据层|Raw Zone|Clean Zone|Physical AI Package|weld_workcell_job_window|manipulation_skill_asset_evidence|equipment_timeseries_observation_package|manufacturing_event_context_package|H300|ManipulationSkillAsset" README.md details.md docs/profiles docs/stage7` 返回 exit 0，确认 README、details、profile 和 Stage 7.1 文档均覆盖关键口径。
+  - 误承诺扫描：`rg -n "已接入真实|生产 connector 已实现|正式 DB schema|MES.*直连已完成|PLC.*直连已完成" README.md details.md docs/profiles docs/stage7` 仅命中 `docs/stage7/sample_request_checklist.md` 中“不在本阶段承诺正式 DB schema”的否定句，未发现已接入真实数据或已实现生产 connector 的表述。
+  - `python scripts/generate_stage7_sim_window.py --output-root /tmp/stage7_1_sim_weld_window --frames 5`：exit 0，生成 `/tmp/stage7_1_sim_weld_window/raw` 和 `/tmp/stage7_1_sim_weld_window/clean/weld_workcell`。
+  - `python -m pytest -q`：`180 passed in 3.98s`。
 
 ## 下一步计划
 
