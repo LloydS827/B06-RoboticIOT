@@ -197,7 +197,7 @@
   - 战略关键词扫描：`rg -n "工业物理 AI 数据层|Raw Zone|Clean Zone|Physical AI Package|weld_workcell_job_window|manipulation_skill_asset_evidence|equipment_timeseries_observation_package|manufacturing_event_context_package|H300|ManipulationSkillAsset" README.md details.md docs/profiles docs/stage7` 返回 exit 0，确认 README、details、profile 和 Stage 7.1 文档均覆盖关键口径。
   - 误承诺扫描：`rg -n "已接入真实|生产 connector 已实现|正式 DB schema|MES.*直连已完成|PLC.*直连已完成" README.md details.md docs/profiles docs/stage7` 仅命中 `docs/stage7/sample_request_checklist.md` 中“不在本阶段承诺正式 DB schema”的否定句，未发现已接入真实数据或已实现生产 connector 的表述。
   - `python scripts/generate_stage7_sim_window.py --output-root /tmp/stage7_1_sim_weld_window --frames 5`：exit 0，生成 `/tmp/stage7_1_sim_weld_window/raw` 和 `/tmp/stage7_1_sim_weld_window/clean/weld_workcell`。
-  - `python -m pytest -q`：`180 passed in 3.98s`。
+  - `python -m pytest -q`：`180 passed`。
 
 ## 下一步计划
 
