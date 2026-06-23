@@ -229,13 +229,21 @@
   - Stage 8 关键词扫描：exit 0，确认 README、details、Stage 7/8 文档、Stage 8 spec 和 plan 均覆盖 Stage 8、H300 synthetic、synthetic-to-real、gap register、A02 evidence handoff 和生成脚本口径。
   - Stage 8 误承诺扫描：首次按全历史递归范围执行时命中 `docs/superpowers/plans/2026-06-22-stage-7-1-industrial-physical-ai-profile-alignment.md` 中的旧扫描命令文本；随后将 Stage 8 验收扫描范围收敛到本轮新增/更新文件后，误承诺扫描 exit 1，无命中。
 
+### 2026-06-23
+
+- 完成 Stage 9 SDK 化与用户入口收敛：B06 对外定位收束为 **Python SDK first** 的工业物理 AI 数据层工具包。
+- 明确入口关系：`physical_ai_data` 是主产品 SDK，`physical-ai-package` 是安装后的标准 CLI 薄入口，`scripts/` 保留为兼容入口和开发期生成器。
+- 已新增 pyproject console entrypoint：`physical-ai-package = physical_ai_data.cli:main`。
+- 已新增 `physical_ai_data.pipelines.run_weld_workcell_pipeline`，用于从 Stage 8 `weld_workcell` Clean Zone 一步生成 Physical AI Package、校验、汇总、候选样本、training/evaluation draft 和可选 Rerun `.rrd`。
+- 根目录 `README.md` 已新增“如何使用本项目”章节、SDK/CLI/scripts 关系表、Mermaid 架构图和三分钟运行流程，并把默认命令切到 `physical-ai-package run-weld-workcell`。
+- SDK 文档入口收敛到 `docs/sdk/README.md`，覆盖稳定公共 API、pipeline helper、importer contract、CLI 与 scripts 的关系和当前边界。
+- 本轮没有新增 Streamlit/Web app、production connector、DB/schema、H300 现场协议或 plugin system。
+
 ## 下一步计划
 
-1. 在 Stage 8 review 之后，用真实/脱敏 A01 H300 最小窗口替换 Stage 8 synthetic Raw Zone，确认样本能否覆盖 `weld_workcell_job_window` 的最小字段组。
-2. 按 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口，优先处理真实 job/task ids、机器人状态时间戳、点云/PCL、相机标定、模型输出、人工修正、工艺参数、事件/报警、质量结果和 AI 控制器存储/权限。
-3. 确认 AI 控制器上的 Raw Zone、Clean Zone、Physical AI Package、Rerun `.rrd`、candidate export 和 training/evaluation draft 的存储位置、读写主体、权限边界和保留策略。
-4. 基于真实/脱敏样本决定 importer/清洗流程是否需要演进，是否需要 connector skeleton、DB/schema 或 Physical AI Package schema changes；没有真实样本证明前不提前扩展。
-5. 将确认后的 A01 H300 evidence 交给 A02 `ManipulationSkillAsset` 候选流程，区分可进入技能资产的 evidence、只作为上下文的字段、只能作为附件引用的大体量 artifact 和仍 blocked 的敏感信息。
+1. Stage 10 SDK adoption hardening：补齐 API 文档、错误信息、examples/notebooks 和更多 pipeline smoke，使研发/平台/工程团队能稳定采用 SDK/CLI。
+2. SDK/CLI 稳定后，可选建设轻量 demo UI；该 UI 只作为演示入口，不替代 SDK 主产品边界。
+3. 真实/脱敏 H300 样本到位后，再替换 Stage 8 synthetic 样本，并使用 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口。
 
 ## 维护约定
 

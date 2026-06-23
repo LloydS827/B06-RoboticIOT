@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Mapping, Protocol
 
@@ -9,7 +9,7 @@ from typing import Mapping, Protocol
 class ImportRequest:
     source_format: str
     source: Mapping[str, object]
-    output_dir: Path
+    output_dir: str | Path
     options: Mapping[str, object] = field(default_factory=dict)
 
 
@@ -32,4 +32,5 @@ class PackageImporter(Protocol):
 def run_import(importer: PackageImporter, request: ImportRequest) -> ImportResult:
     if importer.source_format != request.source_format:
         raise ValueError(f"Importer source_format {importer.source_format} cannot handle {request.source_format}")
-    return importer.import_package(request)
+    normalized_request = replace(request, output_dir=Path(request.output_dir))
+    return importer.import_package(normalized_request)

@@ -145,6 +145,33 @@ def test_run_import_returns_fake_importer_result(tmp_path: Path):
     )
 
 
+def test_run_import_normalizes_string_output_dir(tmp_path: Path):
+    calls: list[ImportRequest] = []
+
+    @dataclass
+    class CapturingImporter:
+        source_format: str = "fake"
+
+        def import_package(self, request: ImportRequest) -> ImportResult:
+            calls.append(request)
+            return ImportResult(
+                package_root=request.output_dir,
+                source_format=self.source_format,
+                source_id="fake-source",
+                frame_count=1,
+            )
+
+    output_dir = tmp_path / "package"
+    request = ImportRequest(source_format="fake", source={}, output_dir=str(output_dir))
+
+    result = run_import(CapturingImporter(), request)
+
+    assert calls
+    assert calls[0].output_dir == output_dir
+    assert isinstance(calls[0].output_dir, Path)
+    assert result.package_root == output_dir
+
+
 def test_run_import_rejects_source_format_mismatch(tmp_path: Path):
     request = ImportRequest(source_format="other", source={}, output_dir=tmp_path / "package")
 

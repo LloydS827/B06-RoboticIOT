@@ -6,6 +6,8 @@ Stage 8 是 **A01 H300 synthetic demo readiness**：在仍无真实或脱敏 H30
 
 本阶段展示的是 Raw Zone -> Clean Zone -> Physical AI Package -> Rerun replay -> candidates -> training/evaluation draft -> A02 evidence handoff 的离线闭环。它不是 real data pilot，不代表现场协议、生产接入或长期存储方案已经确定。
 
+Stage 9 之后，推荐把 Stage 8 fixture 作为 SDK/CLI 的默认演示输入：SDK 是主入口，`physical-ai-package` 是薄 CLI，`scripts/` 主要保留为 synthetic fixture 生成器和兼容入口。
+
 ## 交付物
 
 - `docs/stage8/README.md`：Stage 8 定位、命令、边界和阅读入口。
@@ -15,7 +17,7 @@ Stage 8 是 **A01 H300 synthetic demo readiness**：在仍无真实或脱敏 H30
 
 ## 生成命令
 
-从仓库根目录生成 Stage 8 Raw/Clean fixture：
+从仓库根目录生成 Stage 8 synthetic Raw/Clean fixture：
 
 ```bash
 python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/stage8/h300_synthetic_demo --frames 5
@@ -31,7 +33,41 @@ artifacts/stage8/h300_synthetic_demo/
 
 Raw Zone 中的 H300 story、PCL、模型输出、人工修正和质量结果是 source artifacts，用于展示和缺口评审。Clean Zone 仍只承诺现有 `WeldWorkcellPackageImporter` 可结构化读取的 `weld_workcell` contract。
 
-## Clean Zone -> Package Python 示例
+## 推荐 CLI 链路
+
+安装开发环境后，优先使用标准 CLI 从 Clean Zone 生成 package、候选样本、training draft 和 Rerun `.rrd`：
+
+```bash
+python -m pip install -e ".[dev]"
+physical-ai-package run-weld-workcell \
+  --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
+  --output-dir artifacts/stage8/h300_synthetic_demo/package \
+  --training-split eval \
+  --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
+```
+
+`physical-ai-package` 是安装后的标准 CLI；`python scripts/physical_ai_package.py ...` 仅作为 entrypoint 未安装时的兼容入口。
+
+## SDK Pipeline 示例
+
+Python pipeline helper 是推荐的 SDK 用法：
+
+```python
+from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+result = run_weld_workcell_pipeline(
+    clean_root="artifacts/stage8/h300_synthetic_demo/clean/weld_workcell",
+    output_dir="artifacts/stage8/h300_synthetic_demo/package",
+    training_split="eval",
+    output_rrd="artifacts/stage8/h300_synthetic_demo/package.rrd",
+)
+
+print(result.summary)
+```
+
+## Importer 测试入口
+
+更底层的 `run_import(...)` 仍可用于 importer contract 测试和字段映射调试：
 
 ```bash
 PYTHONPATH=src python - <<'PY'
@@ -51,14 +87,16 @@ run_import(
 PY
 ```
 
-## 后续命令
+## 后续单步命令
+
+如果需要拆开执行，可直接调用 CLI 的单步命令：
 
 ```bash
-python scripts/physical_ai_package.py validate artifacts/stage8/h300_synthetic_demo/package --json
-python scripts/physical_ai_package.py summarize artifacts/stage8/h300_synthetic_demo/package --json
-python scripts/physical_ai_package.py export-candidates artifacts/stage8/h300_synthetic_demo/package
-python scripts/physical_ai_package.py export-training-draft artifacts/stage8/h300_synthetic_demo/package --split eval
-python scripts/physical_ai_package.py convert-rerun artifacts/stage8/h300_synthetic_demo/package --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
+physical-ai-package validate artifacts/stage8/h300_synthetic_demo/package --json
+physical-ai-package summarize artifacts/stage8/h300_synthetic_demo/package --json
+physical-ai-package export-candidates artifacts/stage8/h300_synthetic_demo/package
+physical-ai-package export-training-draft artifacts/stage8/h300_synthetic_demo/package --split eval
+physical-ai-package convert-rerun artifacts/stage8/h300_synthetic_demo/package --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
 ```
 
 这些命令验证的是 Clean Zone offline importer contract、Physical AI Package v0.1、候选样本导出、training/evaluation draft 和 Rerun `.rrd` 适配链路。
@@ -66,10 +104,11 @@ python scripts/physical_ai_package.py convert-rerun artifacts/stage8/h300_synthe
 ## 推荐阅读顺序
 
 1. `docs/stage8/README.md`：确认 Stage 8 的 synthetic 边界和运行方式。
-2. `docs/stage8/capability_visualization_report.md`：查看 Raw Zone 到 A02 evidence handoff 的链路图和字段落点。
-3. `docs/stage8/h300_synthetic_to_real_gap_register.md`：逐条确认真实/脱敏样本需要补齐的字段、文件、权限和触发条件。
-4. `docs/stage8/a02_evidence_demo_example.md`：查看哪些内容可作为 A02 evidence，哪些只能作为 context、attachment reference 或 blocked 项。
-5. `docs/stage7/README.md`：回看 Stage 7.1 作为 Clean Zone contract 历史基线的定位。
+2. `docs/sdk/README.md`：查看 SDK、pipeline helper、CLI 和 scripts 的关系。
+3. `docs/stage8/capability_visualization_report.md`：查看 Raw Zone 到 A02 evidence handoff 的链路图和字段落点。
+4. `docs/stage8/h300_synthetic_to_real_gap_register.md`：逐条确认真实/脱敏样本需要补齐的字段、文件、权限和触发条件。
+5. `docs/stage8/a02_evidence_demo_example.md`：查看哪些内容可作为 A02 evidence，哪些只能作为 context、attachment reference 或 blocked 项。
+6. `docs/stage7/README.md`：回看 Stage 7.1 作为 Clean Zone contract 历史基线的定位。
 
 ## 边界
 
