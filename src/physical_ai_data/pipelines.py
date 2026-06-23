@@ -62,6 +62,8 @@ def run_weld_workcell_pipeline(
         if export_candidates
         else None
     )
+    # Training draft export may create derived/candidates.csv internally for sample rows;
+    # only report candidates_csv when this pipeline step explicitly requested it.
     training_draft_dir = (
         export_training_eval_draft(package_root, split=training_split)
         if training_split is not None

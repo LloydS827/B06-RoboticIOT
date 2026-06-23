@@ -73,6 +73,7 @@ def test_run_weld_workcell_pipeline_wraps_import_failures(tmp_path: Path):
     ) as exc_info:
         run_weld_workcell_pipeline(clean_root=fixture.clean_root, output_dir=tmp_path / "package")
 
+    assert exc_info.value.__cause__ is not None
     assert "process.csv" in str(exc_info.value)
 
 
@@ -106,3 +107,25 @@ def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
         run_weld_workcell_pipeline(clean_root=fixture.clean_root, output_dir=tmp_path / "package")
 
     assert "forced_invalid" in str(exc_info.value)
+    assert "forced validation failure" in str(exc_info.value)
+
+
+def test_run_weld_workcell_pipeline_does_not_report_training_candidate_dependency_as_candidate_export(
+    tmp_path: Path,
+):
+    from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    package_root = tmp_path / "package"
+
+    result = run_weld_workcell_pipeline(
+        clean_root=fixture.clean_root,
+        output_dir=package_root,
+        export_candidates=False,
+    )
+
+    assert result.validation.ok
+    assert result.candidates_csv is None
+    assert result.training_draft_dir == package_root / "derived" / "training_eval"
+    assert (result.training_draft_dir / "samples.csv").is_file()
+    assert (package_root / "derived" / "candidates.csv").is_file()
