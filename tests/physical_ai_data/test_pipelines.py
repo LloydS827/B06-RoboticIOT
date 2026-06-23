@@ -77,6 +77,21 @@ def test_run_weld_workcell_pipeline_wraps_import_failures(tmp_path: Path):
     assert "process.csv" in str(exc_info.value)
 
 
+def test_run_weld_workcell_pipeline_import_error_includes_clean_root(tmp_path: Path):
+    from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    (fixture.clean_root / "process.csv").unlink()
+
+    with pytest.raises(ValueError) as exc_info:
+        run_weld_workcell_pipeline(clean_root=fixture.clean_root, output_dir=tmp_path / "package")
+
+    message = str(exc_info.value)
+    assert "weld_workcell pipeline failed during import" in message
+    assert str(fixture.clean_root) in message
+    assert "process.csv" in message
+
+
 def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -92,7 +107,7 @@ def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
                 ValidationMessage(
                     "forced_invalid",
                     "forced validation failure",
-                    str(package_root),
+                    "frames.csv",
                 ),
             ],
             summary={"frame_count": 0},
@@ -108,6 +123,8 @@ def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
 
     assert "forced_invalid" in str(exc_info.value)
     assert "forced validation failure" in str(exc_info.value)
+    assert str(tmp_path / "package") in str(exc_info.value)
+    assert "frames.csv" in str(exc_info.value)
 
 
 def test_run_weld_workcell_pipeline_does_not_report_training_candidate_dependency_as_candidate_export(

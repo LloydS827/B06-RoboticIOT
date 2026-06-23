@@ -139,8 +139,10 @@ def _manifest(
 
 def _validate_split(split: str) -> None:
     if split not in TRAINING_EVAL_ALLOWED_SPLITS:
+        allowed = ", ".join(TRAINING_EVAL_ALLOWED_SPLITS)
         raise ValueError(
-            f"split must be one of: {', '.join(TRAINING_EVAL_ALLOWED_SPLITS)}"
+            "training/evaluation draft split must be one of "
+            f"{allowed} for {TRAINING_EVAL_EXPORT_FORMAT}; got {split!r}"
         )
 
 
