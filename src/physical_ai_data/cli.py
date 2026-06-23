@@ -259,7 +259,9 @@ def _optional_path(path: Path | None) -> str | None:
     return str(path) if path is not None else None
 
 
-def _normalize_training_split(split: str) -> str | None:
+def _normalize_training_split(split: str | None) -> str | None:
+    if split is None:
+        return "unspecified"
     value = split.strip()
     if value.lower() in {"", "none", "null"}:
         return None

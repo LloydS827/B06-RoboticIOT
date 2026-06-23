@@ -248,6 +248,7 @@ def test_cli_run_weld_workcell_json_handles_disabled_outputs(monkeypatch, tmp_pa
         (" none ", None),
         ("NULL", None),
         (" eval ", "eval"),
+        (None, "unspecified"),
     ],
 )
 def test_cli_normalizes_training_split(value, expected):
