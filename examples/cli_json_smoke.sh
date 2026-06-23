@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHON="${PYTHON:-python3}"
+PYTHON="${PYTHON:-python}"
 OUTPUT_ROOT="${1:-/tmp/b06_stage10_cli_json_smoke}"
 
 "$PYTHON" "$ROOT/scripts/generate_stage8_h300_synthetic_demo.py" --output-root "$OUTPUT_ROOT/fixture" --frames 5 >/dev/null

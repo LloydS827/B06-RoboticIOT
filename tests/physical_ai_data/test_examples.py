@@ -134,3 +134,36 @@ def test_cli_json_smoke_example_runs_from_non_repo_cwd(tmp_path: Path):
     assert payload["validation"]["ok"] is True
     assert payload["summary"]["frame_count"] == 5
     assert Path(payload["package_root"]).is_dir()
+
+
+def test_cli_json_smoke_defaults_to_python_command_when_python_env_is_unset(tmp_path: Path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    python_wrapper = bin_dir / "python"
+    python_wrapper.write_text(f"#!/usr/bin/env bash\nexec {sys.executable!r} \"$@\"\n", encoding="utf-8")
+    python_wrapper.chmod(0o755)
+    python3_wrapper = bin_dir / "python3"
+    python3_wrapper.write_text("#!/usr/bin/env bash\nexit 42\n", encoding="utf-8")
+    python3_wrapper.chmod(0o755)
+
+    env = _env()
+    env.pop("PYTHON", None)
+    env["PATH"] = f"{bin_dir}{os.pathsep}{env['PATH']}"
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "examples" / "cli_json_smoke.sh"),
+            str(tmp_path / "cli_json"),
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["validation"]["ok"] is True
+    assert payload["summary"]["frame_count"] == 5
