@@ -198,8 +198,22 @@ def test_export_training_eval_draft_accepts_allowed_splits(tmp_path: Path, split
 def test_export_training_eval_draft_rejects_invalid_split(tmp_path: Path, split: str):
     package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=11)
 
-    with pytest.raises(ValueError, match="split must be one of"):
+    with pytest.raises(ValueError, match="training/evaluation draft split"):
         export_training_eval_draft(package, split=split)
+
+
+def test_export_training_eval_draft_invalid_split_mentions_contract_and_allowed_values(
+    tmp_path: Path,
+):
+    package = generate_welding_package(tmp_path / "weld", frame_count=12, random_seed=14)
+
+    with pytest.raises(ValueError) as exc_info:
+        export_training_eval_draft(package, split="dev")
+
+    message = str(exc_info.value)
+    assert "training/evaluation draft split" in message
+    assert "physical-ai-training-eval-draft/v0.2" in message
+    assert "unspecified, train, eval, validation, test, holdout" in message
 
 
 def test_export_training_eval_draft_leaves_primary_artifact_empty_for_missing_candidate_frame(

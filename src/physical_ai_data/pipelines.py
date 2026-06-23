@@ -48,13 +48,19 @@ def run_weld_workcell_pipeline(
             ),
         )
     except Exception as exc:
-        raise ValueError(f"weld_workcell pipeline failed during import: {exc}") from exc
+        raise ValueError(
+            "weld_workcell pipeline failed during import "
+            f"(clean_root={Path(clean_root)}): {exc}"
+        ) from exc
 
     package_root = import_result.package_root
     validation = validate(package_root)
     if not validation.ok:
         error_details = _format_validation_errors(validation.errors)
-        raise ValueError(f"weld_workcell pipeline produced invalid package: {error_details}")
+        raise ValueError(
+            "weld_workcell pipeline produced invalid package "
+            f"(package_root={package_root}): {error_details}"
+        )
 
     summary = summarize(package_root)
     candidates_csv = (
