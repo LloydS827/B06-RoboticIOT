@@ -66,6 +66,12 @@ artifacts/stage7/sim_weld_window/clean/weld_workcell/
 - H300 字段对齐：`docs/stage7/h300_weld_workcell_field_alignment.md`。
 - 仿真小作业窗口生成脚本：`scripts/generate_stage7_sim_window.py`。
 
+## Stage 8 过渡
+
+Stage 7.1 现在保留为 A01 H300 Clean Zone contract 和默认历史 fixture 的基线：它说明最小焊接作业窗口如何落到现有 `weld_workcell` importer contract，也保留 sample request、Raw/Clean Zone 和字段对齐口径。
+
+Stage 8 在此基础上增加第二轮 H300-oriented synthetic demo/readiness：在真实/脱敏 H300 样本仍不可用时，用独立 Stage 8 synthetic fixture 展示 Raw/Clean -> Package -> Rerun/candidates/training draft -> A02 evidence handoff 的能力链路，并用 `docs/stage8/h300_synthetic_to_real_gap_register.md` 管理真实替换缺口。真实/脱敏样本替换放在 Stage 8 review 之后，而不是 Stage 7.1 本身直接完成。
+
 ## MVP 边界
 
 本阶段做：
@@ -101,4 +107,4 @@ artifacts/stage7/sim_weld_window/clean/weld_workcell/
 
 ## 下一步
 
-下一步应进入 A01 H300 真实/脱敏样本替换与缺口评审：用一个真实或脱敏焊接作业窗口替换 Stage 7 simulated Raw Zone，记录字段、时间戳、单位、坐标系、存储路径、权限和脱敏缺口。只有真实样本证明必要时，才考虑 importer 演进、connector skeleton、DB schema 或 package schema 扩展。
+下一步应以 Stage 8 为过渡完成 A01 H300 synthetic demo/readiness，再进入真实/脱敏样本替换与缺口评审：用一个真实或脱敏焊接作业窗口替换 Stage 8 synthetic Raw Zone，记录字段、时间戳、单位、坐标系、存储路径、权限和脱敏缺口。只有真实样本证明必要时，才考虑 importer 演进、connector skeleton、DB schema 或 package schema 扩展。
