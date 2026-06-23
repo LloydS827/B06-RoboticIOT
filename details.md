@@ -238,12 +238,37 @@
 - 根目录 `README.md` 已新增“如何使用本项目”章节、SDK/CLI/scripts 关系表、Mermaid 架构图和三分钟运行流程，并把默认命令切到 `physical-ai-package run-weld-workcell`。
 - SDK 文档入口收敛到 `docs/sdk/README.md`，覆盖稳定公共 API、pipeline helper、importer contract、CLI 与 scripts 的关系和当前边界。
 - 本轮没有新增 Streamlit/Web app、production connector、DB/schema、H300 现场协议或 plugin system。
+- 完成 Stage 10 SDK adoption hardening：本阶段目标是让研发、平台和工程团队能稳定采用 SDK/CLI，而不是扩大到 production connector、DB/schema、完整 Web 平台或 H300 现场协议。
+- 新增 Stage 10 设计与执行文档：
+  - `docs/superpowers/specs/2026-06-23-stage-10-sdk-adoption-hardening-design.md`
+  - `docs/superpowers/plans/2026-06-23-stage-10-sdk-adoption-hardening.md`
+- SDK adoption 文档已扩展：
+  - `docs/sdk/README.md`：补齐公共 API、import path、返回对象、pipeline helper、importer contract、错误排查、CLI 到 SDK 映射和边界。
+  - `docs/sdk/adoption_checklist.md`：面向接入团队的环境、输入、验收、输出和数据敏感性 checklist。
+  - `docs/sdk/stage8_pipeline_walkthrough.md`：不依赖 Jupyter 的 Stage 8 notebook-style walkthrough。
+  - `docs/sdk/demo_ui_evaluation.md`：记录轻量 demo UI 的触发条件与非目标，本阶段不实现 UI。
+- 新增可运行 examples：
+  - `examples/sdk_pipeline_stage8.py`
+  - `examples/sdk_existing_package_ops.py`
+  - `examples/sdk_low_level_importer.py`
+  - `examples/cli_json_smoke.sh`
+- 新增 `tests/physical_ai_data/test_examples.py`，覆盖 Python examples 和 CLI JSON smoke，包括从非 repo cwd 调用 shell smoke 的场景。
+- 完成 SDK adoption error polish：`run_weld_workcell_pipeline` 的 import/validation failure 信息包含 `clean_root` 或 `package_root`，training draft invalid split 信息包含 draft contract 和允许值。
+- Stage 10 本轮最终验证结果：
+  - focused verification：`python -m pytest tests/physical_ai_data/test_pipelines.py tests/physical_ai_data/test_training_export.py tests/physical_ai_data/test_examples.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_sdk.py -q` 返回 `55 passed in 5.78s`。
+  - manual examples：
+    - `python examples/sdk_pipeline_stage8.py --output-root /tmp/b06_stage10_sdk_pipeline_verify --frames 5`：exit 0，返回 `validation_ok: true`、`frame_count: 5`，并生成 package、candidates、training draft 和 `.rrd`。
+    - `python examples/sdk_existing_package_ops.py --output-root /tmp/b06_stage10_existing_ops_verify --frames 8`：exit 0，返回 `validation_ok: true`、`frame_count: 8`，并生成 candidates、training draft 和 `.rrd`。
+    - `python examples/sdk_low_level_importer.py --output-root /tmp/b06_stage10_low_level_verify --frames 5`：exit 0，返回 `source_format: weld_workcell`、`frame_count: 5`。
+    - `bash examples/cli_json_smoke.sh /tmp/b06_stage10_cli_json_verify`：exit 0，返回 `validation.ok: true`、`frame_count: 5`。
+  - full test suite：`python -m pytest -q` 返回 `211 passed in 6.86s`。
+  - boundary scan：`rg -n "production connector|DB schema|完整 Web 平台|H300 现场协议|真实 H300 协议|真实数据试点" README.md details.md docs/sdk docs/superpowers/specs/2026-06-23-stage-10-sdk-adoption-hardening-design.md docs/superpowers/plans/2026-06-23-stage-10-sdk-adoption-hardening.md` exit 0；命中均为非目标、边界或历史阶段说明，未发现声称已完成 production connector、DB/schema、完整 Web 平台或真实 H300 协议的表述。
 
 ## 下一步计划
 
-1. Stage 10 SDK adoption hardening：补齐 API 文档、错误信息、examples/notebooks 和更多 pipeline smoke，使研发/平台/工程团队能稳定采用 SDK/CLI。
-2. SDK/CLI 稳定后，可选建设轻量 demo UI；该 UI 只作为演示入口，不替代 SDK 主产品边界。
-3. 真实/脱敏 H300 样本到位后，再替换 Stage 8 synthetic 样本，并使用 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口。
+1. 真实/脱敏 H300 样本到位后，进入 Stage 11 H300 sample replacement readiness，按 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口。
+2. SDK examples 被稳定采用且有明确评审展示需求后，再评估轻量 demo UI；该 UI 只作为演示入口，不替代 SDK 主产品边界。
+3. 在样本驱动的 gap 证明必要前，继续避免 production connector、DB/schema、完整 Web 平台或 H300 现场协议建设。
 
 ## 维护约定
 
