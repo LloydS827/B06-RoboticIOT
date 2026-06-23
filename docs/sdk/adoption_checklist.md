@@ -46,7 +46,7 @@ Python SDK 路径可参考 `examples/sdk_pipeline_stage8.py`。
 CLI smoke：
 
 ```bash
-examples/cli_json_smoke.sh /tmp/b06_stage10_cli_json_smoke
+bash examples/cli_json_smoke.sh /tmp/b06_stage10_cli_json_smoke
 ```
 
 SDK pipeline smoke：
