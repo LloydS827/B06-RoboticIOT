@@ -107,7 +107,7 @@ def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
                 ValidationMessage(
                     "forced_invalid",
                     "forced validation failure",
-                    str(package_root),
+                    "frames.csv",
                 ),
             ],
             summary={"frame_count": 0},
@@ -124,6 +124,7 @@ def test_run_weld_workcell_pipeline_reports_defensive_validation_failure(
     assert "forced_invalid" in str(exc_info.value)
     assert "forced validation failure" in str(exc_info.value)
     assert str(tmp_path / "package") in str(exc_info.value)
+    assert "frames.csv" in str(exc_info.value)
 
 
 def test_run_weld_workcell_pipeline_does_not_report_training_candidate_dependency_as_candidate_export(

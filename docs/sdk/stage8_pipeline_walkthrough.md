@@ -91,7 +91,7 @@ CLI smoke 用于确认命令行入口仍能调用同一 SDK pipeline：
 bash examples/cli_json_smoke.sh /tmp/b06_stage10_cli_json_smoke
 ```
 
-该脚本会生成 Stage 8 synthetic fixture，运行 `physical-ai-package run-weld-workcell --json`，并检查 validation 和 frame count。
+该脚本会生成 Stage 8 synthetic fixture，通过兼容 CLI wrapper 调用 `run-weld-workcell --json`，并检查 validation 和 frame count。
 
 ## Step 6: read gap register before replacement
 

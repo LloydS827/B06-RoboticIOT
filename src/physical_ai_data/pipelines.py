@@ -90,4 +90,9 @@ def run_weld_workcell_pipeline(
 def _format_validation_errors(errors: list[ValidationMessage]) -> str:
     if not errors:
         return "unknown validation error"
-    return "; ".join(f"{error.code}: {error.message}" for error in errors)
+    return "; ".join(_format_validation_error(error) for error in errors)
+
+
+def _format_validation_error(error: ValidationMessage) -> str:
+    path_suffix = f" ({error.path})" if error.path else ""
+    return f"{error.code}: {error.message}{path_suffix}"
