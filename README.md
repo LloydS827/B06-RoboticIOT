@@ -2,6 +2,69 @@
 
 B06 是公司工业物理 AI 的横向数据底座项目，目标是在机器人、智能工站、设备时序和系统级协同项目中统一作业数据包、Raw/Clean Zone、回放、训练/评测导出、数据治理和审计边界，使真实物理过程可观察、可复盘、可训练、可追溯。当前第一优先级是支撑 A01 智能焊接工站形成 H300 最小作业窗口数据闭环，并将其中可用证据交给 A02 技能资产底座。
 
+## 如何使用本项目
+
+B06 是一个 Python SDK first 的工业物理 AI 数据层工具包：用 SDK/CLI 把 Raw/Clean 工业作业数据整理成 Physical AI Package，并导出回放、候选样本、training draft 和 evidence handoff 引用。
+
+| 入口 | 形式 | 适用对象 | 说明 |
+| --- | --- | --- | --- |
+| SDK | `physical_ai_data` Python package | 研发、平台、数据 pipeline | 主产品入口，用于在 Python 中 validate、summarize、export、convert 和运行 pipeline helper。 |
+| CLI | `physical-ai-package ...` | 工程集成、离线验收 | 安装后的标准命令行入口，是 SDK 的薄封装。 |
+| Demo fixture | Stage 8 H300 synthetic Raw/Clean | 评审、演示、回归 | 可提交、可复现的 synthetic 样本，用于展示默认链路；不是 H300 真实数据。 |
+| scripts | `scripts/*.py` | 兼容、开发生成器 | 保留历史脚本和 fixture 生成器；当 console entrypoint 未安装时可作兼容入口。 |
+| Docs/profile | Stage 8 docs、A01/A02 profiles | 业务评审、跨项目 handoff | 说明 synthetic/readiness 边界、A01 字段对齐和 A02 evidence handoff 口径。 |
+
+```mermaid
+flowchart LR
+    user["SDK/CLI user"]
+    raw["Raw Zone\nsource artifacts"]
+    clean["Clean Zone\nimporter contract"]
+    importer["Importer\nWeldWorkcellPackageImporter"]
+    package["Physical AI Package v0.1"]
+    sdk["Python SDK\nvalidate/summarize/export/convert"]
+    cli["CLI\nphysical-ai-package"]
+    outputs["Outputs\nRerun .rrd\ncandidates.csv\ntraining draft\nA02 handoff refs"]
+
+    user --> raw
+    raw --> clean
+    clean --> importer
+    importer --> package
+    package --> sdk
+    sdk --> outputs
+    cli --> sdk
+```
+
+三分钟跑通默认 Stage 8 synthetic 链路：
+
+```bash
+python3 -m pip install -e ".[dev]"
+python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/stage8/h300_synthetic_demo --frames 5
+physical-ai-package run-weld-workcell \
+  --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
+  --output-dir artifacts/stage8/h300_synthetic_demo/package \
+  --training-split eval \
+  --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
+```
+
+Python SDK 调用示例：
+
+```python
+from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+result = run_weld_workcell_pipeline(
+    clean_root="artifacts/stage8/h300_synthetic_demo/clean/weld_workcell",
+    output_dir="artifacts/stage8/h300_synthetic_demo/package",
+    training_split="eval",
+    output_rrd="artifacts/stage8/h300_synthetic_demo/package.rrd",
+)
+
+print(result.summary)
+```
+
+`physical-ai-package` 是安装后的标准 CLI；`python scripts/physical_ai_package.py ...` 仅保留为 entrypoint 尚未安装时的兼容入口。
+
+更多 SDK 用法见 [B06 Python SDK](docs/sdk/README.md)。
+
 ## 项目定位
 
 B06 不定位为通用 IoT 平台，也不定位为生产 connector 项目。它的职责是把真实、脱敏或仿真的工业物理过程数据整理成可追溯的数据资产，支撑 A01 智能焊接工站、A02 机器人技能大师、B08 设备时序样板和 S01 系统级事件闭环。
@@ -44,7 +107,7 @@ Stage 8 展示 Raw Zone、Clean Zone、`weld_workcell` importer、Physical AI Pa
 - **validate / summarize / candidate export**：可对 package 做开发期校验、概要汇总，并导出 `derived/candidates.csv` 候选样本。
 - **Rerun `.rrd` adapter**：可把 Physical AI Package 转换为 Rerun `.rrd`，用于开发期回放和观察。
 - **Training/evaluation draft export v0.2**：可导出 `physical-ai-training-eval-draft/v0.2`，作为后续标注、评估和正式训练格式转换前的 draft sample index。
-- **SDK wrapper / importer contract**：提供 Python 调用层和外部 importer contract，封装 validate、summarize、candidate export、Rerun convert 和 draft export。
+- **Python SDK / pipeline helper / importer contract**：提供 `physical_ai_data` Python 调用层、`run_weld_workcell_pipeline` 和外部 importer contract，封装 validate、summarize、candidate export、Rerun convert 和 draft export。
 - **LeRobot / CSV / simulation fixture**：用于离线验证数据包结构、importer contract 和开放数据承接能力。
 
 ## 四类项目 profile
@@ -64,6 +127,7 @@ Stage 8 展示 Raw Zone、Clean Zone、`weld_workcell` importer、Physical AI Pa
 - [Stage 8 capability visualization report](docs/stage8/capability_visualization_report.md)
 - [Stage 8 H300 synthetic-to-real gap register](docs/stage8/h300_synthetic_to_real_gap_register.md)
 - [Stage 8 A02 evidence handoff synthetic example](docs/stage8/a02_evidence_demo_example.md)
+- [B06 Python SDK](docs/sdk/README.md)
 - [Stage 7.1 A01 H300 最小焊接作业窗口数据试点](docs/stage7/README.md)
 - [A01 H300 真实/脱敏样本请求清单](docs/stage7/sample_request_checklist.md)
 - [A01 H300 Raw/Clean Zone 试点约定](docs/stage7/raw_clean_zone_pilot.md)
@@ -85,17 +149,10 @@ Stage 5 的离线 handoff 仍可用于脱敏样本交换、回归测试、离线
 
 ## 快速开始
 
-默认开发安装和验证：
+默认开发安装：
 
 ```bash
 python3 -m pip install -e ".[dev]"
-python -m pytest -q
-```
-
-生成当前默认可运行的 Stage 7.1 simulated Raw/Clean fixture：
-
-```bash
-python scripts/generate_stage7_sim_window.py --output-root artifacts/stage7/sim_weld_window --frames 5
 ```
 
 生成当前 Stage 8 H300 synthetic demo/readiness fixture：
@@ -104,23 +161,40 @@ python scripts/generate_stage7_sim_window.py --output-root artifacts/stage7/sim_
 python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/stage8/h300_synthetic_demo --frames 5
 ```
 
-生成一个离线演示用机器人焊接工站 package：
+用标准 CLI 从 Clean Zone 生成 package、training draft 和 Rerun `.rrd`：
 
 ```bash
-python scripts/physical_ai_package.py generate welding --output-dir artifacts/stage5/demo_weld
+physical-ai-package run-weld-workcell \
+  --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
+  --output-dir artifacts/stage8/h300_synthetic_demo/package \
+  --training-split eval \
+  --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
+```
+
+运行测试：
+
+```bash
+python -m pytest -q
 ```
 
 ## 常用命令
 
-以下命令以 `artifacts/stage5/demo_weld` 为输入目录，覆盖当前离线默认链路：
+以下命令以 Stage 8 synthetic demo 为输入目录，覆盖当前 SDK-first 离线默认链路：
 
 ```bash
-python scripts/physical_ai_package.py validate artifacts/stage5/demo_weld --json
-python scripts/physical_ai_package.py summarize artifacts/stage5/demo_weld --json
-python scripts/physical_ai_package.py export-candidates artifacts/stage5/demo_weld
-python scripts/physical_ai_package.py export-training-draft artifacts/stage5/demo_weld --split eval
-python scripts/physical_ai_package.py convert-rerun artifacts/stage5/demo_weld --output-rrd artifacts/stage5/demo_weld.rrd
+physical-ai-package run-weld-workcell \
+  --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
+  --output-dir artifacts/stage8/h300_synthetic_demo/package \
+  --training-split eval \
+  --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
+physical-ai-package validate artifacts/stage8/h300_synthetic_demo/package --json
+physical-ai-package summarize artifacts/stage8/h300_synthetic_demo/package --json
+physical-ai-package export-candidates artifacts/stage8/h300_synthetic_demo/package
+physical-ai-package export-training-draft artifacts/stage8/h300_synthetic_demo/package --split eval
+physical-ai-package convert-rerun artifacts/stage8/h300_synthetic_demo/package --output-rrd artifacts/stage8/h300_synthetic_demo/package.rrd
 ```
+
+`python scripts/physical_ai_package.py ...` 仍可用于旧环境或未安装 console entrypoint 的兼容场景；新接入优先使用 `physical-ai-package ...`。
 
 LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境和 `import-lerobot` 命令。
 
@@ -162,7 +236,7 @@ LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境
 
 ### 阶段 8：A01 H300 synthetic demo readiness
 
-目标是在真实/脱敏 H300 样本尚未到位时，提供第二轮 H300-oriented synthetic demo/readiness：独立生成 Stage 8 Raw/Clean fixture，复用现有 `weld_workcell` importer 和 Physical AI Package v0.1 链路，形成 capability visualization、`synthetic-to-real gap register` 和 A02 evidence handoff 示例。本阶段不称为真实数据试点，不新增 connector、DB/schema 或 package schema changes；真实/脱敏样本替换顺延到 Stage 9 或 Stage 8 review 之后。
+目标是在真实/脱敏 H300 样本尚未到位时，提供第二轮 H300-oriented synthetic demo/readiness：独立生成 Stage 8 Raw/Clean fixture，复用现有 `weld_workcell` importer 和 Physical AI Package v0.1 链路，形成 capability visualization、`synthetic-to-real gap register` 和 A02 evidence handoff 示例。本阶段不称为真实数据试点，不新增 connector、DB/schema 或 package schema changes；真实/脱敏样本替换在样本到位后按 gap register 继续推进。
 
 ## 近期输出物
 
@@ -179,6 +253,7 @@ LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境
 - Stage 8 H300 synthetic demo fixture generator
 - H300 synthetic-to-real gap register
 - A02 evidence handoff synthetic example
+- Stage 9 SDK-first 用户入口和 SDK 文档
 - A01/A02/B08/S01 project profile contract 文档包
 - real-data 真机准备截图索引
 - 自研路线判断
@@ -227,6 +302,7 @@ LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境
 - [Stage 8 capability visualization report](docs/stage8/capability_visualization_report.md)
 - [Stage 8 H300 synthetic-to-real gap register](docs/stage8/h300_synthetic_to_real_gap_register.md)
 - [Stage 8 A02 evidence handoff synthetic example](docs/stage8/a02_evidence_demo_example.md)
+- [B06 Python SDK](docs/sdk/README.md)
 - [Profile 总览](docs/profiles/README.md)
 - [A01 H300 profile](docs/profiles/a01_weld_workcell_job_window.md)
 - [A02 ManipulationSkillAsset evidence profile](docs/profiles/a02_manipulation_skill_asset_evidence.md)
@@ -238,7 +314,7 @@ LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境
 
 ## 文档分工
 
-README 记录项目定位、主链路、当前第一样板、当前能力、profile 入口、工程对接方式、快速开始和当前边界，保持在项目级概览层面。更细的执行记录、当前完成事项、下一步计划和阶段性决策记录在 [details.md](details.md) 中。工程团队对接字段、导出目录、验收 checklist、gap register 和常见错误由 Stage 5、Stage 7.1、Stage 8 和 profile 文档共同承载。
+README 记录项目定位、使用入口、主链路、当前第一样板、当前能力、profile 入口、工程对接方式、快速开始和当前边界，保持在项目级概览层面。更细的执行记录、当前完成事项、下一步计划和阶段性决策记录在 [details.md](details.md) 中。SDK API 说明由 [B06 Python SDK](docs/sdk/README.md) 承载；工程团队对接字段、导出目录、验收 checklist、gap register 和常见错误由 Stage 5、Stage 7.1、Stage 8 和 profile 文档共同承载。
 
 ## 交付流程
 
@@ -262,4 +338,6 @@ Stage 6 已新增真机数据接入与数据资产化文档包，包括 `docs/st
 
 Stage 7.1 已将 Stage 7 simulated Raw/Clean fixture 收束为 A01 H300 最小焊接作业窗口数据试点：`scripts/generate_stage7_sim_window.py` 保留为无真机条件下的历史基线，Clean Zone 对齐现有 `WeldWorkcellPackageImporter` contract，并可继续进入 Physical AI Package 的 validate、summarize、candidate export、training/evaluation draft 和 Rerun `.rrd` adapter 链路。`docs/profiles/` 已补充 A01、A02、B08、S01 四类 profile 和 B06 -> A02 evidence handoff，明确共享上游链路与 profile-specific consumption。
 
-Stage 8 当前新增 `scripts/generate_stage8_h300_synthetic_demo.py` 和 `docs/stage8/` readiness 文档包：用独立 H300 synthetic fixture 跑通 Raw/Clean -> Package -> Rerun/candidates/training draft -> A02 evidence handoff 示例，并用 `h300_synthetic_to_real_gap_register.md` 记录真实/脱敏替换需要逐条关闭的问题。下一步仍需用真实/脱敏 A01 H300 最小窗口替换 synthetic Raw Zone，并评审字段、时间戳、坐标系、权限、脱敏和 AI 控制器存储边界后，再决定是否需要 importer 演进、connector skeleton、DB/schema 或 package schema changes。
+Stage 8 当前新增 `scripts/generate_stage8_h300_synthetic_demo.py` 和 `docs/stage8/` readiness 文档包：用独立 H300 synthetic fixture 跑通 Raw/Clean -> Package -> Rerun/candidates/training draft -> A02 evidence handoff 示例，并用 `h300_synthetic_to_real_gap_register.md` 记录真实/脱敏替换需要逐条关闭的问题。
+
+Stage 9 已完成 SDK 化与用户入口收敛：B06 对外定位为 Python SDK first，`physical_ai_data` 是主产品入口，`physical-ai-package` 是标准 CLI 薄封装，`scripts/` 保留为兼容和开发期生成器。当前推荐从 Stage 8 synthetic Clean Zone 通过 `run_weld_workcell_pipeline` 或 `physical-ai-package run-weld-workcell` 跑通默认链路；下一步优先做 Stage 10 SDK adoption hardening，再在真实/脱敏 H300 样本到位后按 gap register 替换 synthetic 样本。
