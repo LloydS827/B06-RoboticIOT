@@ -76,7 +76,7 @@ Stage 5 的离线 handoff 仍可用于脱敏样本交换、回归测试、离线
 
 - B06 不是通用 IoT 平台，不负责普通设备联网、现场网络接入或通用工业协议平台化。
 - 当前不做生产 connector，不实现 TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连或 DB ingestion。
-- 当前不新增长期 DB schema，不修改 Physical AI Package v0.1 schema，不把 simulated fixture 定义为 H300 现场协议。
+- 当前不新增长期 DB schema，不修改 Physical AI Package v0.1 schema，不把 simulated/synthetic fixture 定义为 H300 现场协议。
 - 真实数据来自现场或真机原始数据，不应直接提交仓库。
 - 脱敏数据需要确认客户、工单、人员、路径、图像和点云等敏感信息处理结果；未确认前默认按本地 artifact 或 onsite-only 处理。
 - 仿真数据是仓库内默认可提交、可运行、可复现的样本。

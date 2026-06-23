@@ -111,6 +111,16 @@ def test_stage8_does_not_change_stage7_marker(tmp_path: Path):
     assert (stage8_result.raw_root / ".stage8_h300_synthetic_demo_generated").is_file()
 
 
+def test_stage8_refuses_to_overwrite_stage7_fixture_root(tmp_path: Path):
+    stage7_result = generate_stage7_sim_weld_window(tmp_path / "shared_window")
+
+    with pytest.raises(ValueError, match="refusing to overwrite non-stage8 fixture directory"):
+        generate_stage8_h300_synthetic_demo(stage7_result.root)
+
+    assert (stage7_result.raw_root / ".stage7_sim_window_generated").is_file()
+    assert not (stage7_result.raw_root / ".stage8_h300_synthetic_demo_generated").exists()
+
+
 def test_generate_stage8_h300_synthetic_demo_script_smoke(tmp_path: Path):
     repo_root = Path(__file__).resolve().parents[2]
     output_root = tmp_path / "script_demo"
