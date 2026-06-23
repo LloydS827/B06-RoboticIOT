@@ -2,7 +2,7 @@
 
 ## 定位
 
-B06 的主产品入口是 Python SDK。推荐在研发、平台和数据 pipeline 中直接使用 `physical_ai_data`，把 Raw/Clean 工业作业数据整理为 Physical AI Package，并导出回放、候选样本、training draft 和 evidence handoff 引用。
+B06 的主产品入口是 Python SDK。推荐在研发、平台和数据 pipeline 中直接使用 `physical_ai_data`，把 Clean Zone 工业作业数据和 synthetic/demo Raw/Clean fixture 整理为 Physical AI Package，并导出回放、候选样本、training draft 和 evidence handoff 引用。
 
 CLI 和 scripts 的关系是：
 
@@ -11,9 +11,9 @@ CLI 和 scripts 的关系是：
 
 Stage 9 的目标是让 B06 的用户入口收敛为 SDK first，而不是把项目包装成独立 Web app、生产 connector 或通用 IoT 平台。
 
-## 稳定公共 API
+## 当前公开 API
 
-当前稳定公共 API 从 `physical_ai_data` 顶层导入：
+当前公开 API 从 `physical_ai_data` 顶层导入：
 
 ```python
 from physical_ai_data import (
@@ -113,10 +113,11 @@ print(result.package_root)
 
 ## CLI 和 scripts 的关系
 
-安装开发环境后，标准 CLI 是：
+安装开发环境并生成 Stage 8 demo fixture 后，标准 CLI 是：
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
+python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/stage8/h300_synthetic_demo --frames 5
 physical-ai-package run-weld-workcell \
   --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
   --output-dir artifacts/stage8/h300_synthetic_demo/package \

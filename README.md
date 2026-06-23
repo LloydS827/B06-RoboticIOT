@@ -4,7 +4,7 @@ B06 是公司工业物理 AI 的横向数据底座项目，目标是在机器人
 
 ## 如何使用本项目
 
-B06 是一个 Python SDK first 的工业物理 AI 数据层工具包：用 SDK/CLI 把 Raw/Clean 工业作业数据整理成 Physical AI Package，并导出回放、候选样本、training draft 和 evidence handoff 引用。
+B06 是一个 Python SDK first 的工业物理 AI 数据层工具包：用 SDK/CLI 把 Clean Zone 工业作业数据和 synthetic/demo Raw/Clean fixture 整理成 Physical AI Package，并导出回放、候选样本、training draft 和 evidence handoff 引用。
 
 | 入口 | 形式 | 适用对象 | 说明 |
 | --- | --- | --- | --- |
@@ -37,7 +37,7 @@ flowchart LR
 三分钟跑通默认 Stage 8 synthetic 链路：
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 python scripts/generate_stage8_h300_synthetic_demo.py --output-root artifacts/stage8/h300_synthetic_demo --frames 5
 physical-ai-package run-weld-workcell \
   --clean-root artifacts/stage8/h300_synthetic_demo/clean/weld_workcell \
@@ -152,7 +152,7 @@ Stage 5 的离线 handoff 仍可用于脱敏样本交换、回归测试、离线
 默认开发安装：
 
 ```bash
-python3 -m pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
 
 生成当前 Stage 8 H300 synthetic demo/readiness fixture：
