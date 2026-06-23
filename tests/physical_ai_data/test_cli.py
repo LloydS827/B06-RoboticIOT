@@ -2,12 +2,19 @@ import json
 import os
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 from physical_ai_data.schema import ValidationMessage, ValidationResult
 
 
 SCRIPT = Path("scripts/physical_ai_package.py")
+
+
+def test_pyproject_exposes_physical_ai_package_console_script():
+    pyproject = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+
+    assert pyproject["project"]["scripts"]["physical-ai-package"] == "physical_ai_data.cli:main"
 
 
 def _run(args: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:

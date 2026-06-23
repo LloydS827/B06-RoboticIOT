@@ -22,6 +22,9 @@ lerobot = [
   "lerobot>=0.3.0",
 ]
 
+[project.scripts]
+physical-ai-package = "physical_ai_data.cli:main"
+
 [tool.uv]
 override-dependencies = [
   "rerun-sdk[dataplatform]>=0.33.0",
