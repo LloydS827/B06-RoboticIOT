@@ -5,6 +5,8 @@ import sys
 import tomllib
 from pathlib import Path
 
+import pytest
+
 from physical_ai_data.schema import ValidationMessage, ValidationResult
 
 
@@ -237,6 +239,21 @@ def test_cli_run_weld_workcell_json_handles_disabled_outputs(monkeypatch, tmp_pa
     assert payload["candidates_csv"] is None
     assert payload["training_draft_dir"] is None
     assert payload["rrd_path"] is None
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("", None),
+        (" none ", None),
+        ("NULL", None),
+        (" eval ", "eval"),
+    ],
+)
+def test_cli_normalizes_training_split(value, expected):
+    from physical_ai_data import cli
+
+    assert cli._normalize_training_split(value) == expected
 
 
 def test_cli_run_weld_workcell_stage8_smoke(tmp_path: Path):
