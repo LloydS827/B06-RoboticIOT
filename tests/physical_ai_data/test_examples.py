@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def _env() -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src")
+    env["PYTHON"] = sys.executable
     return env
 
 
@@ -101,6 +102,27 @@ def test_cli_json_smoke_example_runs(tmp_path: Path):
             str(tmp_path / "cli_json"),
         ],
         cwd=ROOT,
+        env=_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["validation"]["ok"] is True
+    assert payload["summary"]["frame_count"] == 5
+    assert Path(payload["package_root"]).is_dir()
+
+
+def test_cli_json_smoke_example_runs_from_non_repo_cwd(tmp_path: Path):
+    result = subprocess.run(
+        [
+            "bash",
+            str(ROOT / "examples" / "cli_json_smoke.sh"),
+            str(tmp_path / "cli_json"),
+        ],
+        cwd=tmp_path,
         env=_env(),
         text=True,
         capture_output=True,
