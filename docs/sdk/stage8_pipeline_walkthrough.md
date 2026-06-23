@@ -35,6 +35,8 @@ python examples/sdk_pipeline_stage8.py \
   --frames 5
 ```
 
+该 example 是自包含 smoke：它会在 `/tmp/b06_stage8_pipeline_walkthrough/fixture` 重新生成一份 Stage 8 fixture，不复用 Step 2 的 `artifacts/...` 目录。
+
 也可以在自己的 Python 脚本中使用同一 helper：
 
 ```python

@@ -35,16 +35,16 @@ from physical_ai_data import (
 )
 ```
 
-| API | 输入状态 | 输出 | 文件副作用 |
-| --- | --- | --- | --- |
-| `validate(package_root)` | 已存在的 Physical AI Package | `ValidationResult` | 无 |
-| `summarize(package_root)` | 已存在且可读取的 package | `dict[str, object]` summary | 无 |
-| `export_candidates_csv(package_root, output_csv=None, min_score=0.5)` | 已存在的 package | `Path` | 写入 `output_csv`，默认 `package_root/derived/candidates.csv` |
-| `export_training_eval_draft(package_root, output_dir=None, split="unspecified")` | 已存在的 package；`split` 应是调用方接受的 split 名称 | `Path` | 写入 draft 目录，默认 `package_root/derived/training_eval`；可能生成候选样本中间文件 |
-| `convert_to_rerun(package_root, output_rrd)` | 已存在的 package | `Path` | 写入 `.rrd` 文件 |
-| `run_weld_workcell_pipeline(clean_root, output_dir, ...)` | `weld_workcell` Clean Zone 根目录 | `PipelineResult` | 写 package；可选写 candidates、training draft、`.rrd` |
-| `run_import(importer, ImportRequest(...))` | importer contract 输入 | `ImportResult` | 由 importer 决定；`WeldWorkcellPackageImporter` 会写 package |
-| `generate_stage8_h300_synthetic_demo(output_root, frame_count=5)` | demo 输出根目录 | Stage 8 fixture result | 写 synthetic Raw/Clean fixture；这是 demo helper，不是顶层 API |
+| API | Import path | 输入状态 | 输出 | 文件副作用 |
+| --- | --- | --- | --- | --- |
+| `validate(package_root)` | `physical_ai_data.validate` | 已存在的 Physical AI Package | `ValidationResult` | 无 |
+| `summarize(package_root)` | `physical_ai_data.summarize` | 已存在且可读取的 package | `dict[str, object]` summary | 无 |
+| `export_candidates_csv(package_root, output_csv=None, min_score=0.5)` | `physical_ai_data.export_candidates_csv` | 已存在的 package | `Path` | 写入 `output_csv`，默认 `package_root/derived/candidates.csv` |
+| `export_training_eval_draft(package_root, output_dir=None, split="unspecified")` | `physical_ai_data.export_training_eval_draft` | 已存在的 package；`split` 只能是 `unspecified`、`train`、`eval`、`validation`、`test`、`holdout` | `Path` | 写入 draft 目录，默认 `package_root/derived/training_eval`；可能生成候选样本中间文件 |
+| `convert_to_rerun(package_root, output_rrd)` | `physical_ai_data.convert_to_rerun` | 已存在的 package | `Path` | 写入 `.rrd` 文件 |
+| `run_weld_workcell_pipeline(clean_root, output_dir, ...)` | `physical_ai_data.pipelines.run_weld_workcell_pipeline` | `weld_workcell` Clean Zone 根目录 | `PipelineResult` | 写 package；可选写 candidates、training draft、`.rrd` |
+| `run_import(importer, ImportRequest(...))` | `physical_ai_data.importers.run_import` | importer contract 输入 | `ImportResult` | 由 importer 决定；`WeldWorkcellPackageImporter` 会写 package |
+| `generate_stage8_h300_synthetic_demo(output_root, frame_count=5)` | `physical_ai_data.stage8_h300_demo.generate_stage8_h300_synthetic_demo` | demo 输出根目录 | Stage 8 fixture result | 写 synthetic Raw/Clean fixture；这是 demo helper，不是顶层 API |
 
 ## 返回对象
 
@@ -154,7 +154,7 @@ print(result.package_root)
 - **缺少 Clean Zone 文件**：`weld_workcell` 输入必须包含 `job.json`、`frames.csv`、`process.csv`、`events.csv`；`review_labels.csv` 可选。缺文件时先回到 fixture 生成或 Clean Zone replacement 步骤。
 - **invalid package**：pipeline helper 会在 import 后调用 `validate`；若报 `weld_workcell pipeline produced invalid package`，先查看 `ValidationResult.errors` 中的 `code`、`message`、`path`。
 - **invalid package source**：如果 `source_format` 不是 `weld_workcell`，`WeldWorkcellPackageImporter` 不会处理；使用正确 importer 或修正 `ImportRequest.source_format`。
-- **invalid split**：当前 SDK 只把 `split` 作为 training draft 的元数据写入；建议 adoption 阶段统一使用 `eval` 或 `unspecified`，避免下游评审对 split 语义不一致。
+- **invalid split**：当前允许值是 `unspecified`、`train`、`eval`、`validation`、`test`、`holdout`；建议 adoption 阶段统一使用 `eval` 或 `unspecified`，避免下游评审对 split 语义不一致。
 - **image path issues**：`frames.csv` 的 `image_path` 必须能从 Clean Zone root 解析。若真实/脱敏替换时图片暂不可交付，先在 Stage 8 gap register 中标记，不要把缺图伪装成生产接入完成。
 - **输出目录与源目录相同**：`WeldWorkcellPackageImporter` 会拒绝 `output_dir` 等于 `source.root`，避免覆盖 Clean Zone。
 
