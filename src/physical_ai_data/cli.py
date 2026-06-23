@@ -9,6 +9,7 @@ from typing import Callable
 
 from physical_ai_data.importers import ImportRequest, run_import
 from physical_ai_data.lerobot_adapter import LeRobotPackageImporter
+from physical_ai_data.pipelines import PipelineResult, run_weld_workcell_pipeline
 from physical_ai_data.samples import generate_pick_sort_package, generate_welding_package
 from physical_ai_data.schema import ValidationResult
 from physical_ai_data.sdk import (
@@ -66,6 +67,25 @@ def _build_parser() -> argparse.ArgumentParser:
     training.add_argument("--output-dir", type=Path, help="Output directory. Defaults to PACKAGE/derived/training_eval.")
     training.add_argument("--split", default="unspecified", help="Split label to write into the draft.")
     training.set_defaults(func=_export_training_draft)
+
+    run_weld = subcommands.add_parser(
+        "run-weld-workcell",
+        help="Import a clean weld workcell export and run package derivation steps.",
+    )
+    run_weld.add_argument("--clean-root", type=Path, required=True, help="Clean weld workcell root directory.")
+    run_weld.add_argument("--output-dir", type=Path, required=True, help="Output package directory.")
+    run_weld.add_argument(
+        "--copy-images",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Copy image assets into the package.",
+    )
+    run_weld.add_argument("--no-candidates", action="store_true", help="Skip candidates CSV export.")
+    run_weld.add_argument("--candidate-min-score", type=float, default=0.5, help="Minimum candidate score.")
+    run_weld.add_argument("--training-split", default="unspecified", help="Split label for training draft export.")
+    run_weld.add_argument("--output-rrd", type=Path, help="Optional output .rrd path.")
+    run_weld.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    run_weld.set_defaults(func=_run_weld_workcell)
 
     import_lerobot = subcommands.add_parser("import-lerobot", help="Import a LeRobot episode into a Physical AI Package.")
     import_lerobot.add_argument("--repo-id", required=True, help="LeRobot repository ID.")
@@ -157,6 +177,31 @@ def _export_training_draft(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_weld_workcell(args: argparse.Namespace) -> int:
+    result = run_weld_workcell_pipeline(
+        clean_root=args.clean_root,
+        output_dir=args.output_dir,
+        copy_images=args.copy_images,
+        export_candidates=not args.no_candidates,
+        candidate_min_score=args.candidate_min_score,
+        training_split=_normalize_training_split(args.training_split),
+        output_rrd=args.output_rrd,
+    )
+
+    if args.json:
+        _print_json(_pipeline_payload(result))
+        return 0
+
+    print(f"Wrote Physical AI Package: {result.package_root}")
+    if result.candidates_csv is not None:
+        print(f"Wrote candidates: {result.candidates_csv}")
+    if result.training_draft_dir is not None:
+        print(f"Wrote training/evaluation draft: {result.training_draft_dir}")
+    if result.rrd_path is not None:
+        print(f"Wrote Rerun recording: {result.rrd_path}")
+    return 0
+
+
 def _import_lerobot(args: argparse.Namespace) -> int:
     if args.max_frames is not None and args.max_frames <= 0:
         raise ValueError("max_frames must be positive")
@@ -192,6 +237,33 @@ def _validation_payload(package: Path, result: ValidationResult) -> dict[str, ob
         "errors": [asdict(error) for error in result.errors],
         "warnings": [asdict(warning) for warning in result.warnings],
     }
+
+
+def _pipeline_payload(result: PipelineResult) -> dict[str, object]:
+    return {
+        "package_root": str(result.package_root),
+        "validation": {
+            "ok": result.validation.ok,
+            "summary": result.validation.summary,
+            "errors": [asdict(error) for error in result.validation.errors],
+            "warnings": [asdict(warning) for warning in result.validation.warnings],
+        },
+        "summary": result.summary,
+        "candidates_csv": _optional_path(result.candidates_csv),
+        "training_draft_dir": _optional_path(result.training_draft_dir),
+        "rrd_path": _optional_path(result.rrd_path),
+    }
+
+
+def _optional_path(path: Path | None) -> str | None:
+    return str(path) if path is not None else None
+
+
+def _normalize_training_split(split: str) -> str | None:
+    value = split.strip()
+    if value.lower() in {"", "none", "null"}:
+        return None
+    return value
 
 
 def _format_summary(summary: dict[str, object]) -> str:

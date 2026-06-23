@@ -141,6 +141,132 @@ def test_cli_existing_package_operations_call_sdk_wrappers(monkeypatch, tmp_path
     ]
 
 
+def test_cli_run_weld_workcell_maps_args_to_pipeline(monkeypatch, tmp_path: Path, capsys):
+    from physical_ai_data import cli
+    from physical_ai_data.pipelines import PipelineResult
+
+    calls = []
+
+    def fake_pipeline(**kwargs):
+        calls.append(kwargs)
+        package_root = tmp_path / "package"
+        return PipelineResult(
+            package_root=package_root,
+            validation=ValidationResult(summary={"frame_count": 5}),
+            summary={"package_id": "pkg", "frame_count": 5},
+            candidates_csv=package_root / "derived" / "candidates.csv",
+            training_draft_dir=package_root / "derived" / "training_eval",
+            rrd_path=tmp_path / "package.rrd",
+        )
+
+    monkeypatch.setattr(cli, "run_weld_workcell_pipeline", fake_pipeline)
+
+    result = cli.main(
+        [
+            "run-weld-workcell",
+            "--clean-root",
+            str(tmp_path / "clean" / "weld_workcell"),
+            "--output-dir",
+            str(tmp_path / "package"),
+            "--no-copy-images",
+            "--candidate-min-score",
+            "0.8",
+            "--training-split",
+            "eval",
+            "--output-rrd",
+            str(tmp_path / "package.rrd"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert result == 0
+    assert calls == [
+        {
+            "clean_root": tmp_path / "clean" / "weld_workcell",
+            "output_dir": tmp_path / "package",
+            "copy_images": False,
+            "export_candidates": True,
+            "candidate_min_score": 0.8,
+            "training_split": "eval",
+            "output_rrd": tmp_path / "package.rrd",
+        }
+    ]
+    assert "Wrote Physical AI Package" in captured.out
+    assert str(tmp_path / "package") in captured.out
+
+
+def test_cli_run_weld_workcell_json_handles_disabled_outputs(monkeypatch, tmp_path: Path, capsys):
+    from physical_ai_data import cli
+    from physical_ai_data.pipelines import PipelineResult
+
+    calls = []
+
+    def fake_pipeline(**kwargs):
+        calls.append(kwargs)
+        return PipelineResult(
+            package_root=tmp_path / "package",
+            validation=ValidationResult(summary={"frame_count": 5}),
+            summary={"frame_count": 5},
+            candidates_csv=None,
+            training_draft_dir=None,
+            rrd_path=None,
+        )
+
+    monkeypatch.setattr(cli, "run_weld_workcell_pipeline", fake_pipeline)
+
+    result = cli.main(
+        [
+            "run-weld-workcell",
+            "--clean-root",
+            str(tmp_path / "clean"),
+            "--output-dir",
+            str(tmp_path / "package"),
+            "--no-candidates",
+            "--training-split",
+            "none",
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert result == 0
+    assert calls[0]["export_candidates"] is False
+    assert calls[0]["training_split"] is None
+    assert payload["package_root"] == str(tmp_path / "package")
+    assert payload["candidates_csv"] is None
+    assert payload["training_draft_dir"] is None
+    assert payload["rrd_path"] is None
+
+
+def test_cli_run_weld_workcell_stage8_smoke(tmp_path: Path):
+    from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    package_root = tmp_path / "package"
+    output_rrd = tmp_path / "package.rrd"
+
+    result = _run(
+        [
+            "run-weld-workcell",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--output-dir",
+            str(package_root),
+            "--training-split",
+            "eval",
+            "--output-rrd",
+            str(output_rrd),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert (package_root / "physical_ai_manifest.json").is_file()
+    assert (package_root / "derived" / "candidates.csv").is_file()
+    assert (package_root / "derived" / "training_eval" / "training_eval_manifest.json").is_file()
+    assert output_rrd.is_file()
+
+
 def test_cli_summarize_json_invalid_package_uses_sdk_validate(monkeypatch, tmp_path: Path):
     from physical_ai_data import cli
 
