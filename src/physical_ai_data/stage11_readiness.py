@@ -241,7 +241,15 @@ def _check_frame_image_paths(
     for row in rows:
         image_value = (row.get("image_path") or "").strip()
         if not image_value:
-            continue
+            checks.append(
+                ReadinessCheck(
+                    "frames:image_path",
+                    CHECK_BLOCK,
+                    "frames.csv image_path values must be non-empty",
+                    str(clean_root / "frames.csv"),
+                )
+            )
+            return
         if not _path_exists_within_root(clean_root, image_value):
             checks.append(
                 ReadinessCheck(
