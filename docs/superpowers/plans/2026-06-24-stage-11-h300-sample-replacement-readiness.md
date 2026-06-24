@@ -103,6 +103,18 @@ def test_stage11_readiness_clean_only_keeps_raw_gaps_blocked_without_blocking_ov
     assert _gap_status(report, "G-012").status == "blocked"
 
 
+def test_stage11_readiness_raw_artifact_gaps_do_not_block_pipeline_smoke(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    (fixture.raw_root / "manifest.raw.json").unlink()
+    (fixture.raw_root / "files" / "model_outputs.json").unlink()
+
+    report = assess_h300_sample_readiness(fixture.clean_root, raw_root=fixture.raw_root)
+
+    assert report.overall_status == "review_required"
+    assert _gap_status(report, "G-005").status == "blocked"
+    assert any(check.check_id == "raw:manifest.raw.json" and check.status == "review" for check in report.checks)
+
+
 def test_stage11_readiness_blocks_missing_timestamp_column(tmp_path: Path):
     fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
     frames_path = fixture.clean_root / "frames.csv"
@@ -234,7 +246,8 @@ Implementation details:
 - `process.csv` and `events.csv`: parse headers; missing headers -> block `<file>:header`.
 - `review_labels.csv`: present -> review/pass check; absent -> review check, not block.
 - Raw artifact evidence:
-  - If `raw_root` is provided and `manifest.raw.json` exists/readable, check pass/review.
+  - If `raw_root` is provided and `manifest.raw.json` is missing or unreadable, add a `review` check, not a `block` check.
+  - Raw/source artifact gaps never make `overall_status` blocked by themselves; they are represented through gap statuses and review checks.
   - Check these paths explicitly:
     - G-003: `files/point_clouds/window_0000.pcd`, `files/pcl_seam_candidates.json`
     - G-004: `files/images/front_0000.png`
@@ -393,6 +406,9 @@ def _assess_h300_readiness(args: argparse.Namespace) -> int:
         if check.status != "pass":
             location = f" ({check.path})" if check.path else ""
             print(f"- {check.status}: {check.check_id}: {check.message}{location}")
+    for gap in report.gap_statuses:
+        if gap.status != "ready_to_review":
+            print(f"- gap {gap.gap_id}: {gap.status}: {gap.next_step}")
     return 0
 ```
 
