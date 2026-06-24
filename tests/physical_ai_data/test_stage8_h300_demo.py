@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import json
 import subprocess
 import sys
@@ -63,6 +64,9 @@ def test_generate_stage8_h300_demo_writes_raw_artifacts_and_clean_fixture(tmp_pa
     assert actual_clean_files == expected_clean_files
     for relative_path in expected_clean_files:
         assert (result.clean_root / relative_path).is_file()
+    frames = list(csv.DictReader((result.clean_root / "frames.csv").open(newline="", encoding="utf-8")))
+    assert frames
+    assert {row["image_path"] for row in frames} == {"images/front_0000.png"}
 
 
 def test_generate_stage8_h300_demo_refuses_unknown_existing_raw_dir(tmp_path: Path):
