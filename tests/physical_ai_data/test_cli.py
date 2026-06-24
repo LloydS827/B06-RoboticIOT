@@ -345,6 +345,28 @@ def test_cli_assess_h300_readiness_stage8_json_smoke(tmp_path: Path):
     assert len(payload["gap_statuses"]) == 12
 
 
+def test_cli_assess_h300_readiness_blocked_report_still_exits_zero(tmp_path: Path):
+    from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    (fixture.clean_root / "process.csv").unlink()
+
+    result = _run(
+        [
+            "assess-h300-readiness",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--raw-root",
+            str(fixture.raw_root),
+            "--json",
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["overall_status"] == "blocked"
+
+
 def test_cli_assess_h300_readiness_text_output_lists_gap_next_steps(tmp_path: Path):
     from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
 
