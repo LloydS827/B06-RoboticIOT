@@ -285,6 +285,86 @@ def test_cli_run_weld_workcell_stage8_smoke(tmp_path: Path):
     assert output_rrd.is_file()
 
 
+def test_cli_assess_h300_readiness_maps_args(monkeypatch, tmp_path: Path, capsys):
+    from physical_ai_data import cli
+    from physical_ai_data.stage11_readiness import H300ReadinessReport
+
+    calls = []
+
+    def fake_assess(clean_root, raw_root=None):
+        calls.append((clean_root, raw_root))
+        return H300ReadinessReport(
+            clean_root=Path(clean_root),
+            raw_root=Path(raw_root) if raw_root is not None else None,
+            overall_status="review_required",
+            checks=[],
+            gap_statuses=[],
+            summary={"frame_count": 5},
+        )
+
+    monkeypatch.setattr(cli, "assess_h300_sample_readiness", fake_assess)
+
+    result = cli.main(
+        [
+            "assess-h300-readiness",
+            "--clean-root",
+            str(tmp_path / "clean"),
+            "--raw-root",
+            str(tmp_path / "raw"),
+            "--json",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert result == 0
+    assert calls == [(tmp_path / "clean", tmp_path / "raw")]
+    assert payload["overall_status"] == "review_required"
+    assert payload["summary"]["frame_count"] == 5
+
+
+def test_cli_assess_h300_readiness_stage8_json_smoke(tmp_path: Path):
+    from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    result = _run(
+        [
+            "assess-h300-readiness",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--raw-root",
+            str(fixture.raw_root),
+            "--json",
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["overall_status"] == "review_required"
+    assert payload["summary"]["frame_count"] == 5
+    assert len(payload["gap_statuses"]) == 12
+
+
+def test_cli_assess_h300_readiness_text_output_lists_gap_next_steps(tmp_path: Path):
+    from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    result = _run(
+        [
+            "assess-h300-readiness",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--raw-root",
+            str(fixture.raw_root),
+        ]
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "H300 readiness: review_required" in result.stdout
+    assert "gap G-003" in result.stdout
+    assert "next step:" in result.stdout
+
+
 def test_cli_summarize_json_invalid_package_uses_sdk_validate(monkeypatch, tmp_path: Path):
     from physical_ai_data import cli
 

@@ -19,6 +19,7 @@ from physical_ai_data.sdk import (
     summarize,
     validate,
 )
+from physical_ai_data.stage11_readiness import assess_h300_sample_readiness
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -86,6 +87,15 @@ def _build_parser() -> argparse.ArgumentParser:
     run_weld.add_argument("--output-rrd", type=Path, help="Optional output .rrd path.")
     run_weld.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     run_weld.set_defaults(func=_run_weld_workcell)
+
+    readiness = subcommands.add_parser(
+        "assess-h300-readiness",
+        help="assess H300 Clean/Raw sample replacement readiness.",
+    )
+    readiness.add_argument("--clean-root", type=Path, required=True, help="Clean H300 sample root directory.")
+    readiness.add_argument("--raw-root", type=Path, help="Optional Raw H300 sample root directory.")
+    readiness.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    readiness.set_defaults(func=_assess_h300_readiness)
 
     import_lerobot = subcommands.add_parser("import-lerobot", help="Import a LeRobot episode into a Physical AI Package.")
     import_lerobot.add_argument("--repo-id", required=True, help="LeRobot repository ID.")
@@ -200,6 +210,45 @@ def _run_weld_workcell(args: argparse.Namespace) -> int:
     if result.rrd_path is not None:
         print(f"Wrote Rerun recording: {result.rrd_path}")
     return 0
+
+
+def _assess_h300_readiness(args: argparse.Namespace) -> int:
+    report = assess_h300_sample_readiness(args.clean_root, raw_root=args.raw_root)
+    if args.json:
+        _print_json(report.to_dict())
+        return 0
+
+    _print_h300_readiness_text(report)
+    return 0
+
+
+def _print_h300_readiness_text(report) -> None:
+    print(f"H300 readiness: {report.overall_status}")
+    print(f"clean_root: {report.clean_root}")
+    if report.raw_root is not None:
+        print(f"raw_root: {report.raw_root}")
+
+    non_pass_checks = [check for check in report.checks if check.status != "pass"]
+    if non_pass_checks:
+        print("Non-pass checks:")
+        for check in non_pass_checks:
+            detail = f"- {check.check_id}: {check.status} - {check.message}"
+            if check.path is not None:
+                detail = f"{detail} ({check.path})"
+            print(detail)
+    else:
+        print("Non-pass checks: none")
+
+    non_ready_gaps = [gap for gap in report.gap_statuses if gap.status != "ready_to_review"]
+    if non_ready_gaps:
+        print("Non-ready gaps:")
+        for gap in non_ready_gaps:
+            print(f"- gap {gap.gap_id}: {gap.status}")
+            if gap.evidence:
+                print(f"  evidence: {', '.join(gap.evidence)}")
+            print(f"  next step: {gap.next_step}")
+    else:
+        print("Non-ready gaps: none")
 
 
 def _import_lerobot(args: argparse.Namespace) -> int:
