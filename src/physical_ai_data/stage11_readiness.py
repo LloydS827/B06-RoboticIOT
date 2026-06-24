@@ -164,7 +164,7 @@ def assess_h300_sample_readiness(
         review_labels_exists=review_labels_exists,
         raw_evidence=raw_evidence,
     )
-    overall_status = _overall_status(checks)
+    overall_status = _overall_status(checks, gap_statuses)
     summary = {
         "clean_required_files_present": required_present,
         "frame_count": frame_count,
@@ -241,15 +241,7 @@ def _check_frame_image_paths(
     for row in rows:
         image_value = (row.get("image_path") or "").strip()
         if not image_value:
-            checks.append(
-                ReadinessCheck(
-                    "frames:image_path",
-                    CHECK_BLOCK,
-                    "frames.csv image_path values must be non-empty",
-                    str(clean_root / "frames.csv"),
-                )
-            )
-            return
+            continue
         if not _path_exists_within_root(clean_root, image_value):
             checks.append(
                 ReadinessCheck(
@@ -405,9 +397,11 @@ def _gap(gap_id: str, status: str, evidence: list[str], next_step: str) -> GapSt
     return GapStatus(gap_id=gap_id, status=status, evidence=evidence, next_step=next_step)
 
 
-def _overall_status(checks: list[ReadinessCheck]) -> str:
+def _overall_status(checks: list[ReadinessCheck], gap_statuses: list[GapStatus]) -> str:
     if any(check.status == CHECK_BLOCK for check in checks):
         return OVERALL_BLOCKED
     if any(check.status == CHECK_REVIEW for check in checks):
+        return OVERALL_REVIEW
+    if any(gap.status != GAP_READY for gap in gap_statuses):
         return OVERALL_REVIEW
     return OVERALL_READY

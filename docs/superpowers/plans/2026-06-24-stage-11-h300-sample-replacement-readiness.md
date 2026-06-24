@@ -89,6 +89,15 @@ def test_stage11_readiness_blocks_missing_image_reference(tmp_path: Path):
     assert any(check.check_id == "frames:image_path" and check.status == "block" for check in report.checks)
 
 
+def test_stage11_readiness_allows_empty_image_references(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+
+    report = assess_h300_sample_readiness(fixture.clean_root, raw_root=fixture.raw_root)
+
+    assert report.overall_status == "review_required"
+    assert all(check.status != "block" for check in report.checks)
+
+
 def test_stage11_readiness_clean_only_keeps_raw_gaps_blocked_without_blocking_overall(tmp_path: Path):
     fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
 
@@ -242,7 +251,7 @@ Implementation details:
   - No rows -> block `frames:rows`.
   - Missing `timestamp_s` -> block `frames:timestamp_s`.
   - Missing any `TCP_POSE_COLUMNS` -> block `frames:tcp_pose`.
-  - If `image_path` column exists and value is non-empty, reject absolute paths, `..` escapes, symlink escapes, and missing files with block `frames:image_path`.
+  - If `image_path` column exists, empty values are allowed and mean this frame has no image. Non-empty values must be relative, non-escaping, symlink-safe, and point to existing files; violations block `frames:image_path`.
 - `process.csv` and `events.csv`: parse headers; missing headers -> block `<file>:header`.
 - `review_labels.csv`: present -> review/pass check; absent -> review check, not block.
 - Raw artifact evidence:
@@ -257,7 +266,7 @@ Implementation details:
     - G-012: `files/seam_trajectory.json`, `files/pcl_seam_candidates.json`
 - Overall status:
   - If any check status is `block`, `blocked`.
-  - Else if any check status is `review`, `review_required`.
+  - Else if any check status is `review`, or any gap status is not `ready_to_review`, `review_required`.
   - Else `ready_for_pipeline_smoke`.
 - Gap mapping:
   - G-001: `ready_to_review` if job ID clue is present, else `blocked`.

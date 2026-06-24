@@ -66,7 +66,8 @@ def test_generate_stage8_h300_demo_writes_raw_artifacts_and_clean_fixture(tmp_pa
         assert (result.clean_root / relative_path).is_file()
     frames = list(csv.DictReader((result.clean_root / "frames.csv").open(newline="", encoding="utf-8")))
     assert frames
-    assert {row["image_path"] for row in frames} == {"images/front_0000.png"}
+    assert frames[0]["image_path"] == "images/front_0000.png"
+    assert all(row["image_path"] == "" for row in frames[1:])
 
 
 def test_generate_stage8_h300_demo_refuses_unknown_existing_raw_dir(tmp_path: Path):

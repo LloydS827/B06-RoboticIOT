@@ -104,8 +104,8 @@ Stage 11 采用方案 B：**文档 + 轻量 readiness checker**。
 
 `overall_status` 聚合规则：
 
-- 只有 Clean Zone 最小 contract 相关的 `block` check 会使整体状态变为 `blocked`，包括必需文件缺失、JSON/CSV 不可读、`frames.csv` 无行、关键列缺失、图片引用越界或目标不存在。
-- 若 Clean Zone 最小 contract 通过，但存在 review 类 check，或某些 gap 因 Raw/source artifacts 不足而为 `blocked`，整体状态为 `review_required`。这表示可以继续跑 pipeline smoke，但不能关闭对应 gap。
+- 只有 Clean Zone 最小 contract 相关的 `block` check 会使整体状态变为 `blocked`，包括必需文件缺失、JSON/CSV 不可读、`frames.csv` 无行、关键列缺失、非空图片引用越界或目标不存在。
+- 若 Clean Zone 最小 contract 通过，但存在 review 类 check，或某些 gap 因 Raw/source artifacts 不足而不是 `ready_to_review`，整体状态为 `review_required`。这表示可以继续跑 pipeline smoke，但不能关闭对应 gap。
 - 若 Clean Zone 最小 contract 通过，且没有 review/block check，整体状态为 `ready_for_pipeline_smoke`。
 
 ## 7. 检查规则
@@ -115,10 +115,10 @@ Stage 11 采用方案 B：**文档 + 轻量 readiness checker**。
 - 必需 Clean Zone 文件：`job.json`、`frames.csv`、`process.csv`、`events.csv`。
 - 可选 Clean Zone 文件：`review_labels.csv`。
 - `job.json` 必须可解析，并至少包含任务/作业窗口类字段中的一个可用线索。
-- `frames.csv` 必须可解析，至少有一行，并包含 `timestamp_s` 与 TCP pose 相关列；如存在 `image_path`，检查相对路径不越界且文件存在。
+- `frames.csv` 必须可解析，至少有一行，并包含 `timestamp_s` 与 TCP pose 相关列；如存在非空 `image_path`，检查相对路径不越界且文件存在。空 `image_path` 沿用现有 `weld_workcell` importer contract，表示该帧无可交付图片，不单独阻塞 readiness。
 - `process.csv` 与 `events.csv` 必须可解析，至少检查 header。
 - 如提供 `raw_root`，读取 `manifest.raw.json` 和已知 Stage 8 source artifact 路径，作为 G-003、G-004、G-005、G-011、G-012 的评审证据。
-- 第一版不支持新的 onsite-only 图片声明格式；若 `image_path` 存在但目标文件缺失，统一按 Clean contract 阻塞处理。后续若真实样本证明必须支持 onsite-only 引用，再单独设计字段或 metadata 扩展。
+- 第一版不支持新的 onsite-only 图片声明格式；若非空 `image_path` 目标文件缺失，统一按 Clean contract 阻塞处理。后续若真实样本证明必须支持 onsite-only 引用，再单独设计字段或 metadata 扩展。
 - checker 不尝试验证客户字段真实性、脱敏充分性、坐标系数学正确性、时钟同步质量或 A02 evidence 业务可用性。
 
 ## 8. Gap 映射
@@ -169,7 +169,7 @@ physical-ai-package assess-h300-readiness \
 
 - Stage 8 synthetic fixture + `raw_root` 应得到非 blocked 的 readiness report，并包含 G-001 至 G-012 的 gap status。
 - 删除必需 Clean Zone 文件应使 overall status 为 `blocked`，并指出具体文件。
-- 删除图片引用目标应 blocked，避免把缺图样本误判为 ready。
+- 删除非空图片引用目标应 blocked，避免把缺图样本误判为 ready；空 `image_path` 仍按无图片帧处理。
 - 只提供 Clean Zone、不提供 Raw Zone 时，Clean contract 相关 gap 可 `ready_to_review`，Raw/source artifact gap 保持 `blocked` 或 `needs_raw_review`。
 - CLI JSON smoke 应可从 repo root 运行，并返回 `overall_status`、`checks`、`gap_statuses`。
 - 文档扫描确认 README、details、docs/stage11 覆盖 Stage 11、sample replacement readiness、gap register 和非目标。

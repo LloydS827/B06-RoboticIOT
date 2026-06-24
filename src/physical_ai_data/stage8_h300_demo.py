@@ -375,7 +375,7 @@ def _frames(frame_count: int) -> list[dict[str, str]]:
                 "tcp_qy": "0.0000",
                 "tcp_qz": _format_number(0.015 * index),
                 "tcp_qw": _format_number(1.0 - 0.0015 * index),
-                "image_path": "images/front_0000.png",
+                "image_path": "images/front_0000.png" if index == 0 else "",
             }
         )
     return rows
