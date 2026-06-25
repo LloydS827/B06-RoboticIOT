@@ -264,9 +264,50 @@
   - full test suite：`python -m pytest -q` 返回 `211 passed in 6.86s`。
   - boundary scan：`rg -n "production connector|DB schema|完整 Web 平台|H300 现场协议|真实 H300 协议|真实数据试点" README.md details.md docs/sdk docs/superpowers/specs/2026-06-23-stage-10-sdk-adoption-hardening-design.md docs/superpowers/plans/2026-06-23-stage-10-sdk-adoption-hardening.md` exit 0；命中均为非目标、边界或历史阶段说明，未发现声称已完成 production connector、DB/schema、完整 Web 平台或真实 H300 协议的表述。
 
+### 2026-06-24
+
+- 完成 Stage 11 H300 sample replacement readiness：本阶段目标是在 Stage 8 synthetic baseline 和 Stage 10 SDK adoption path 之后，提供真实/脱敏 H300 样本替换前的本地检查、gap 状态口径和文档路径。
+- Stage 11 关键决策：
+  - readiness checker 只读取本地 `weld_workcell` Clean Zone 和可选 Raw Zone，不写 package、不联网、不提交真实样本。
+  - `overall_status=blocked` 只表示 Clean Zone replacement 仍有阻塞项；CLI assessment 本身执行成功时仍返回 exit 0，便于记录 blocked report。
+  - Raw/source artifact 缺口只进入 review/gap status，不单独阻断 pipeline smoke。
+  - 空 `image_path` 沿用现有 `WeldWorkcellPackageImporter` contract，表示该帧无图片；非空 `image_path` 必须相对、不可越界且目标存在。
+  - Stage 11 不实现 production connector、DB/schema、H300 现场协议、demo UI、A02 converter，也不修改 Physical AI Package v0.1 schema。
+- Stage 11 新增/更新文件：
+  - `src/physical_ai_data/stage11_readiness.py`
+  - `tests/physical_ai_data/test_stage11_readiness.py`
+  - `docs/stage11/README.md`
+  - `docs/superpowers/specs/2026-06-24-stage-11-h300-sample-replacement-readiness-design.md`
+  - `docs/superpowers/plans/2026-06-24-stage-11-h300-sample-replacement-readiness.md`
+  - `README.md`
+  - `details.md`
+  - `src/physical_ai_data/cli.py`
+  - `tests/physical_ai_data/test_cli.py`
+- Stage 11 readiness checker 行为：
+  - 必需 Clean Zone 文件为 `job.json`、`frames.csv`、`process.csv`、`events.csv`。
+  - 检查 `job.json` 的作业/任务/窗口标识线索和 `weld_workcell` importer required fields，`frames.csv` 的 `timestamp_s`、TCP pose、required columns 和非空图片路径安全性，`process.csv` / `events.csv` 的 CSV header 与 required columns，以及可选 `review_labels.csv` 的 required columns。
+  - 若提供 Raw Zone root，读取 `manifest.raw.json` 和 Stage 8 gap register 对应的 source artifact 路径，为 G-003、G-004、G-005、G-009、G-011、G-012 等提供 review evidence。
+  - report 输出 `checks`、`gap_statuses` 和 `summary`，可通过 SDK `assess_h300_sample_readiness(...)` 或 CLI `physical-ai-package assess-h300-readiness --clean-root ... --raw-root ... --json` 获取。
+- Stage 11 本轮验证结果：
+  - 基线验证：实现前在隔离 worktree 运行 `python -m pytest -q` 返回 `211 passed in 10.11s`。
+  - Task 1 focused：`python -m pytest tests/physical_ai_data/test_stage8_h300_demo.py tests/physical_ai_data/test_stage11_readiness.py -q` 返回 `17 passed in 0.55s`。
+  - Task 2 targeted：`python -m pytest tests/physical_ai_data/test_cli.py::test_cli_assess_h300_readiness_maps_args tests/physical_ai_data/test_cli.py::test_cli_assess_h300_readiness_stage8_json_smoke tests/physical_ai_data/test_cli.py::test_cli_assess_h300_readiness_blocked_report_still_exits_zero tests/physical_ai_data/test_cli.py::test_cli_assess_h300_readiness_text_output_lists_gap_next_steps -q` 返回 `4 passed in 0.21s`。
+  - Task 2 combined：`python -m pytest tests/physical_ai_data/test_stage11_readiness.py tests/physical_ai_data/test_cli.py -q` 返回 `34 passed in 2.37s`。
+  - 文档阶段 focused：`python -m pytest tests/physical_ai_data/test_stage11_readiness.py tests/physical_ai_data/test_cli.py -q` 返回 `34 passed in 3.14s`。
+  - full test suite：`python -m pytest -q` 返回 `224 passed in 11.63s`。
+  - Stage 8 fixture generation：`python scripts/generate_stage8_h300_synthetic_demo.py --output-root /tmp/stage11_h300_demo --frames 5` exit 0，生成 `/tmp/stage11_h300_demo/raw` 和 `/tmp/stage11_h300_demo/clean/weld_workcell`。
+  - 首次直接运行 `physical-ai-package assess-h300-readiness ...` 命中旧 editable install，CLI 尚未包含新子命令；随后在当前 worktree 执行 `python -m pip install -e ".[dev]"` 后重跑成功。
+  - manual readiness smoke：`physical-ai-package assess-h300-readiness --clean-root /tmp/stage11_h300_demo/clean/weld_workcell --raw-root /tmp/stage11_h300_demo/raw --json` exit 0，返回 `overall_status: review_required`、`summary.frame_count: 5`，并包含 12 条 `gap_statuses`。
+  - 最终 focused verification：`python -m pytest tests/physical_ai_data/test_stage11_readiness.py tests/physical_ai_data/test_cli.py -q` 返回 `36 passed in 2.29s`。
+  - 最终 full test suite：`python -m pytest -q` 返回 `226 passed in 7.04s`。
+  - 最终 readiness smoke：重新生成 `/tmp/stage11_h300_demo` 后运行 `physical-ai-package assess-h300-readiness --clean-root /tmp/stage11_h300_demo/clean/weld_workcell --raw-root /tmp/stage11_h300_demo/raw --json`，exit 0，返回 `overall_status: review_required`、`summary.frame_count: 5` 和 12 条 `gap_statuses`。
+  - 最终文档正向扫描：`rg -n "Stage 11|sample replacement readiness|assess-h300-readiness|gap register|Stage 12|脱敏 H300|不实现 production connector|不修改 Physical AI Package" README.md details.md docs/stage11 docs/superpowers/specs/2026-06-24-stage-11-h300-sample-replacement-readiness-design.md` exit 0。
+  - 最终误承诺扫描：按 Stage 11 指定词表扫描 README、details 和 `docs/stage11`，exit 1，无命中；为避免扫描命令文本自命中，本文不内嵌完整词表。
+- Stage 12 建议：只有在至少一条脱敏 H300 最小作业窗口样本完成访问边界、提交边界和受控目录确认后，才进入 first de-identified H300 sample replacement pilot；Stage 12 应基于 Stage 11 report 和 Stage 8 gap register 逐条关闭、拆分或升级缺口。
+
 ## 下一步计划
 
-1. 真实/脱敏 H300 样本到位后，进入 Stage 11 H300 sample replacement readiness，按 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐条关闭、拆分或升级缺口。
+1. 至少一条脱敏 H300 最小作业窗口样本完成访问和提交边界确认后，进入 Stage 12 first de-identified H300 sample replacement pilot，并用 Stage 11 readiness report 驱动 Stage 8 gap register 的关闭、拆分或升级。
 2. SDK examples 被稳定采用且有明确评审展示需求后，再评估轻量 demo UI；该 UI 只作为演示入口，不替代 SDK 主产品边界。
 3. 在样本驱动的 gap 证明必要前，继续避免 production connector、DB/schema、完整 Web 平台或 H300 现场协议建设。
 
