@@ -17,7 +17,7 @@ physical-ai-package doctor --json
 重点查看：
 
 - `ok`：为 `true` 表示 SDK 环境没有阻断错误；为 `false` 时先修环境。
-- `package_file`：应指向当前 worktree 或当前 repo 的 `src/physical_ai_data/__init__.py`，不要指向旧 editable install。
+- `package_file`：应指向当前 worktree 或当前 repo 的 `src/physical_ai_data/__init__.py`，不要指向旧 editable install；若当前 repo root 存在 `src/physical_ai_data` 但 import path 指向其他工作树，`doctor` 会返回错误。
 - `console_entrypoint`：应能解析到当前环境中的 `physical-ai-package`。
 - `warnings`：`rerun`、`lerobot` 这类可选依赖缺失只影响对应能力，不代表 Clean Zone readiness 不能运行。
 
@@ -141,7 +141,7 @@ payload = result.to_dict()
 
 按失败来源分流处理：
 
-- environment：`doctor` 报错或 import path 指向旧 worktree 时，先修 editable install、Python 环境或 PATH。
+- environment：`doctor` 报错、import path 指向旧 worktree，或 `package_file` 不在当前工作树时，先修 editable install、Python 环境或 PATH。
 - Clean Zone contract：缺少 `job.json`、`frames.csv`、`process.csv`、`events.csv`，CSV header 不满足 contract，或图片路径不可解析时，先修 Clean Zone。
 - Raw evidence：Raw root 或 `manifest.raw.json` 缺失时，记录为 review/gap 状态，不把它伪装成已完成现场接入。
 - de-identification/permission：脱敏、访问、提交边界未确认时，不提交候选样本，不进入 downstream 训练或评审扩散。

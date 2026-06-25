@@ -31,6 +31,25 @@ def test_inspect_sdk_environment_errors_when_package_file_is_missing(monkeypatch
     assert report.to_dict()["errors"]
 
 
+def test_inspect_sdk_environment_errors_when_package_file_is_outside_current_repo(
+    monkeypatch,
+    tmp_path: Path,
+):
+    import physical_ai_data
+    import physical_ai_data.environment as environment
+
+    stale_package = tmp_path / "stale-worktree" / "src" / "physical_ai_data" / "__init__.py"
+    stale_package.parent.mkdir(parents=True)
+    stale_package.write_text('"""stale package"""', encoding="utf-8")
+
+    monkeypatch.setattr(physical_ai_data, "__file__", str(stale_package))
+
+    report = environment.inspect_sdk_environment()
+
+    assert report.ok is False
+    assert any("current working tree" in error for error in report.errors)
+
+
 def test_inspect_sdk_environment_warns_when_console_entrypoint_is_missing(monkeypatch):
     import physical_ai_data.environment as environment
 

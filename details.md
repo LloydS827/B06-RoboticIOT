@@ -311,7 +311,7 @@
 - Stage 11.1 代码与示例更新：
   - 顶层 `physical_ai_data` 和 `physical_ai_data.sdk` 现在导出 `assess_h300_sample_readiness(...)`、`H300ReadinessReport`、`ReadinessCheck`、`GapStatus`、`inspect_sdk_environment()` 和 `SdkEnvironmentReport`。
   - `PipelineResult.to_dict()` 作为 SDK/CLI 共享输出索引结构，CLI `run-weld-workcell --json` 复用该结构。
-  - `physical-ai-package doctor --json` 作为候选样本整理前的环境检查入口，用于确认当前 SDK import path、console entrypoint 和可选依赖状态；旧 editable install 指向不存在路径时会返回非零 report。
+  - `physical-ai-package doctor --json` 作为候选样本整理前的环境检查入口，用于确认当前 SDK import path、console entrypoint 和可选依赖状态；旧 editable install 指向不存在路径，或指向当前工作树外的仍存在路径时会返回非零 report。
   - `examples/sdk_real_data_onboarding.py` 作为候选 Clean/Raw root 模板，串起 readiness、pipeline smoke、`output_index`、错误 JSON 和 next steps；readiness `blocked` 时返回 exit 2 且不写 package。
 - Stage 11.1 文档更新：
   - `docs/sdk/real_data_onboarding.md` 作为主 guide，串起环境检查、输入准备、readiness、pipeline smoke、输出索引、失败分流和边界。

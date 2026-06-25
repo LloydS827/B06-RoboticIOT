@@ -61,6 +61,7 @@ def inspect_sdk_environment() -> SdkEnvironmentReport:
 
     warnings: list[str] = []
     errors: list[str] = []
+    cwd = Path.cwd()
 
     package_file = getattr(physical_ai_data, "__file__", None)
     package_path_exists = bool(package_file and Path(package_file).exists())
@@ -68,6 +69,11 @@ def inspect_sdk_environment() -> SdkEnvironmentReport:
         errors.append("physical_ai_data.__file__ is missing")
     elif not package_path_exists:
         errors.append(f"physical_ai_data.__file__ path does not exist: {package_file}")
+    elif _current_tree_has_sdk_source(cwd) and not _is_relative_to(Path(package_file), cwd):
+        errors.append(
+            "physical_ai_data.__file__ is outside the current working tree: "
+            f"{package_file}"
+        )
 
     console_entrypoint = shutil.which("physical-ai-package")
     console_entrypoint_exists = bool(console_entrypoint and Path(console_entrypoint).exists())
@@ -86,7 +92,7 @@ def inspect_sdk_environment() -> SdkEnvironmentReport:
         package_file=package_file,
         package_path_exists=package_path_exists,
         python_executable=sys.executable,
-        cwd=str(Path.cwd()),
+        cwd=str(cwd),
         console_entrypoint=console_entrypoint,
         console_entrypoint_exists=console_entrypoint_exists,
         optional_dependencies=optional_dependencies,
@@ -101,3 +107,15 @@ def _inspect_optional_dependency(name: str) -> OptionalDependencyStatus:
     except Exception as exc:
         return OptionalDependencyStatus(name=name, installed=False, import_error=str(exc))
     return OptionalDependencyStatus(name=name, installed=installed)
+
+
+def _current_tree_has_sdk_source(cwd: Path) -> bool:
+    return (cwd / "src" / "physical_ai_data").is_dir()
+
+
+def _is_relative_to(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+    except ValueError:
+        return False
+    return True
