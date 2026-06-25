@@ -4,10 +4,12 @@ from physical_ai_data.sdk import (
     GapStatus,
     H300ReadinessReport,
     ReadinessCheck,
+    SdkEnvironmentReport,
     assess_h300_sample_readiness,
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_sdk_environment,
     summarize,
     validate,
 )
@@ -25,4 +27,6 @@ __all__ = [
     "H300ReadinessReport",
     "ReadinessCheck",
     "assess_h300_sample_readiness",
+    "SdkEnvironmentReport",
+    "inspect_sdk_environment",
 ]

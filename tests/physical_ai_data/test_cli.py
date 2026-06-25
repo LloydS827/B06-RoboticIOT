@@ -406,6 +406,51 @@ def test_cli_assess_h300_readiness_text_output_lists_gap_next_steps(tmp_path: Pa
     assert "next step:" in result.stdout
 
 
+def test_cli_doctor_json_reports_environment():
+    result = _run(["doctor", "--json"])
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["package_path_exists"] is True
+    assert payload["python_executable"]
+
+
+def test_cli_doctor_text_reports_import_path():
+    result = _run(["doctor"])
+
+    assert result.returncode == 0, result.stderr
+    assert "SDK environment" in result.stdout
+    assert "package_file:" in result.stdout
+
+
+def test_cli_doctor_returns_nonzero_when_environment_report_has_errors(monkeypatch, capsys):
+    from physical_ai_data import cli
+    from physical_ai_data.environment import SdkEnvironmentReport
+
+    report = SdkEnvironmentReport(
+        package_version="0.1.0",
+        package_file="/tmp/missing/__init__.py",
+        package_path_exists=False,
+        python_executable="/usr/bin/python",
+        cwd="/tmp",
+        console_entrypoint=None,
+        console_entrypoint_exists=False,
+        optional_dependencies=[],
+        warnings=[],
+        errors=["package path does not exist"],
+    )
+
+    monkeypatch.setattr(cli, "inspect_sdk_environment", lambda: report)
+
+    result = cli.main(["doctor", "--json"])
+    payload = json.loads(capsys.readouterr().out)
+
+    assert result == 1
+    assert payload["ok"] is False
+    assert payload["errors"]
+
+
 def test_cli_summarize_json_invalid_package_uses_sdk_validate(monkeypatch, tmp_path: Path):
     from physical_ai_data import cli
 

@@ -16,6 +16,7 @@ from physical_ai_data.sdk import (
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_sdk_environment,
     summarize,
     validate,
 )
@@ -96,6 +97,10 @@ def _build_parser() -> argparse.ArgumentParser:
     readiness.add_argument("--raw-root", type=Path, help="Optional Raw H300 sample root directory.")
     readiness.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     readiness.set_defaults(func=_assess_h300_readiness)
+
+    doctor = subcommands.add_parser("doctor", help="Inspect the installed SDK environment.")
+    doctor.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    doctor.set_defaults(func=_doctor)
 
     import_lerobot = subcommands.add_parser("import-lerobot", help="Import a LeRobot episode into a Physical AI Package.")
     import_lerobot.add_argument("--repo-id", required=True, help="LeRobot repository ID.")
@@ -220,6 +225,38 @@ def _assess_h300_readiness(args: argparse.Namespace) -> int:
 
     _print_h300_readiness_text(report)
     return 0
+
+
+def _doctor(args: argparse.Namespace) -> int:
+    report = inspect_sdk_environment()
+    if args.json:
+        _print_json(report.to_dict())
+    else:
+        _print_environment_text(report)
+    return 0 if report.ok else 1
+
+
+def _print_environment_text(report) -> None:
+    print("SDK environment")
+    print(f"ok: {report.ok}")
+    print(f"package_version: {report.package_version}")
+    print(f"package_file: {report.package_file}")
+    print(f"package_path_exists: {report.package_path_exists}")
+    print(f"python_executable: {report.python_executable}")
+    print(f"cwd: {report.cwd}")
+    print(f"console_entrypoint: {report.console_entrypoint}")
+    print(f"console_entrypoint_exists: {report.console_entrypoint_exists}")
+    print("optional_dependencies:")
+    for dependency in report.optional_dependencies:
+        print(f"- {dependency.name}: installed={dependency.installed}")
+    if report.warnings:
+        print("warnings:")
+        for warning in report.warnings:
+            print(f"- {warning}")
+    if report.errors:
+        print("errors:")
+        for error in report.errors:
+            print(f"- {error}")
 
 
 def _print_h300_readiness_text(report) -> None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from physical_ai_data.candidates import export_candidates, summarize_package
+from physical_ai_data.environment import SdkEnvironmentReport, inspect_sdk_environment
 from physical_ai_data.rerun_adapter import write_rrd
 from physical_ai_data.schema import ValidationResult
 from physical_ai_data.stage11_readiness import (
@@ -24,6 +25,8 @@ __all__ = [
     "H300ReadinessReport",
     "ReadinessCheck",
     "assess_h300_sample_readiness",
+    "SdkEnvironmentReport",
+    "inspect_sdk_environment",
 ]
 
 
