@@ -298,8 +298,8 @@
   - Stage 8 fixture generation：`python scripts/generate_stage8_h300_synthetic_demo.py --output-root /tmp/stage11_h300_demo --frames 5` exit 0，生成 `/tmp/stage11_h300_demo/raw` 和 `/tmp/stage11_h300_demo/clean/weld_workcell`。
   - 首次直接运行 `physical-ai-package assess-h300-readiness ...` 命中旧 editable install，CLI 尚未包含新子命令；随后在当前 worktree 执行 `python -m pip install -e ".[dev]"` 后重跑成功。
   - manual readiness smoke：`physical-ai-package assess-h300-readiness --clean-root /tmp/stage11_h300_demo/clean/weld_workcell --raw-root /tmp/stage11_h300_demo/raw --json` exit 0，返回 `overall_status: review_required`、`summary.frame_count: 5`，并包含 12 条 `gap_statuses`。
-  - 最终 focused verification：`python -m pytest tests/physical_ai_data/test_stage11_readiness.py tests/physical_ai_data/test_cli.py -q` 返回 `36 passed in 2.96s`。
-  - 最终 full test suite：`python -m pytest -q` 返回 `226 passed in 7.62s`。
+  - 最终 focused verification：`python -m pytest tests/physical_ai_data/test_stage11_readiness.py tests/physical_ai_data/test_cli.py -q` 返回 `36 passed in 2.29s`。
+  - 最终 full test suite：`python -m pytest -q` 返回 `226 passed in 7.04s`。
   - 最终 readiness smoke：重新生成 `/tmp/stage11_h300_demo` 后运行 `physical-ai-package assess-h300-readiness --clean-root /tmp/stage11_h300_demo/clean/weld_workcell --raw-root /tmp/stage11_h300_demo/raw --json`，exit 0，返回 `overall_status: review_required`、`summary.frame_count: 5` 和 12 条 `gap_statuses`。
   - 最终文档正向扫描：`rg -n "Stage 11|sample replacement readiness|assess-h300-readiness|gap register|Stage 12|脱敏 H300|不实现 production connector|不修改 Physical AI Package" README.md details.md docs/stage11 docs/superpowers/specs/2026-06-24-stage-11-h300-sample-replacement-readiness-design.md` exit 0。
   - 最终误承诺扫描：按 Stage 11 指定词表扫描 README、details 和 `docs/stage11`，exit 1，无命中；为避免扫描命令文本自命中，本文不内嵌完整词表。
