@@ -31,11 +31,11 @@ class PipelineResult:
             "package_root": str(self.package_root),
             "validation": {
                 "ok": self.validation.ok,
-                "summary": self.validation.summary,
+                "summary": dict(self.validation.summary),
                 "errors": [asdict(error) for error in self.validation.errors],
                 "warnings": [asdict(warning) for warning in self.validation.warnings],
             },
-            "summary": self.summary,
+            "summary": dict(self.summary),
             "candidates_csv": _optional_path(self.candidates_csv),
             "training_draft_dir": _optional_path(self.training_draft_dir),
             "rrd_path": _optional_path(self.rrd_path),

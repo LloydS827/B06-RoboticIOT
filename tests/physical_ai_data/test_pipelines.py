@@ -63,6 +63,23 @@ def test_pipeline_result_to_dict_matches_cli_payload_contract(tmp_path: Path):
     assert payload["rrd_path"] == str(output_rrd)
 
 
+def test_pipeline_result_to_dict_copies_summary_payloads(tmp_path: Path):
+    from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    result = run_weld_workcell_pipeline(
+        clean_root=fixture.clean_root,
+        output_dir=tmp_path / "package",
+    )
+
+    payload = result.to_dict()
+    payload["summary"]["frame_count"] = 999
+    payload["validation"]["summary"]["frame_count"] = 999
+
+    assert result.summary["frame_count"] == 5
+    assert result.validation.summary["frame_count"] == 5
+
+
 def test_run_weld_workcell_pipeline_can_skip_optional_outputs(tmp_path: Path):
     from physical_ai_data.pipelines import run_weld_workcell_pipeline
 
