@@ -8,9 +8,15 @@ from pathlib import Path
 import physical_ai_data
 import physical_ai_data.sdk as sdk
 from physical_ai_data import (
+    GapStatus,
+    H300ReadinessReport,
+    ReadinessCheck,
+    SdkEnvironmentReport,
+    assess_h300_sample_readiness,
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_sdk_environment,
     summarize,
     validate,
 )
@@ -24,6 +30,12 @@ def test_top_level_exports_sdk_functions():
     assert callable(export_candidates_csv)
     assert callable(convert_to_rerun)
     assert callable(export_training_eval_draft)
+    assert callable(assess_h300_sample_readiness)
+    assert callable(inspect_sdk_environment)
+    assert isinstance(GapStatus.__name__, str)
+    assert isinstance(H300ReadinessReport.__name__, str)
+    assert isinstance(ReadinessCheck.__name__, str)
+    assert isinstance(SdkEnvironmentReport.__name__, str)
     assert physical_ai_data.__version__ == "0.1.0"
     assert set(physical_ai_data.__all__) == {
         "__version__",
@@ -32,6 +44,12 @@ def test_top_level_exports_sdk_functions():
         "export_candidates_csv",
         "convert_to_rerun",
         "export_training_eval_draft",
+        "GapStatus",
+        "H300ReadinessReport",
+        "ReadinessCheck",
+        "assess_h300_sample_readiness",
+        "SdkEnvironmentReport",
+        "inspect_sdk_environment",
     }
     assert set(sdk.__all__) == {
         "validate",
@@ -39,6 +57,12 @@ def test_top_level_exports_sdk_functions():
         "export_candidates_csv",
         "convert_to_rerun",
         "export_training_eval_draft",
+        "GapStatus",
+        "H300ReadinessReport",
+        "ReadinessCheck",
+        "assess_h300_sample_readiness",
+        "SdkEnvironmentReport",
+        "inspect_sdk_environment",
     }
 
 

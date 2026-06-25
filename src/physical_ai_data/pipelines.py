@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from physical_ai_data.importers import ImportRequest, run_import
@@ -25,6 +25,21 @@ class PipelineResult:
     candidates_csv: Path | None
     training_draft_dir: Path | None
     rrd_path: Path | None
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "package_root": str(self.package_root),
+            "validation": {
+                "ok": self.validation.ok,
+                "summary": dict(self.validation.summary),
+                "errors": [asdict(error) for error in self.validation.errors],
+                "warnings": [asdict(warning) for warning in self.validation.warnings],
+            },
+            "summary": dict(self.summary),
+            "candidates_csv": _optional_path(self.candidates_csv),
+            "training_draft_dir": _optional_path(self.training_draft_dir),
+            "rrd_path": _optional_path(self.rrd_path),
+        }
 
 
 def run_weld_workcell_pipeline(
@@ -96,3 +111,7 @@ def _format_validation_errors(errors: list[ValidationMessage]) -> str:
 def _format_validation_error(error: ValidationMessage) -> str:
     path_suffix = f" ({error.path})" if error.path else ""
     return f"{error.code}: {error.message}{path_suffix}"
+
+
+def _optional_path(path: Path | None) -> str | None:
+    return str(path) if path is not None else None

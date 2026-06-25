@@ -9,7 +9,7 @@ CLI 和 scripts 的关系是：
 - `physical-ai-package ...`：安装后的标准 CLI，是 SDK 的薄封装，用于工程集成和离线验收。
 - `scripts/*.py`：兼容入口和开发期生成器，用于生成 synthetic/demo fixture，或在 console entrypoint 尚未安装时调用历史脚本。
 
-Stage 10 的目标是让 SDK adoption 更稳、更容易复现。它不把项目扩展成独立 Web app、production connector 或通用 IoT 平台；Stage 8 synthetic fixture 仍是默认可运行 demo。
+Stage 10 的目标是让 SDK adoption 更稳、更容易复现。Stage 11.1 在此基础上补齐 candidate real/de-identified Clean Zone 的 real-data onboarding 路径：先用 `doctor` 确认环境，再运行 readiness 和 pipeline smoke。它不把项目扩展成独立 Web app、production connector 或通用 IoT 平台；Stage 8 synthetic fixture 仍是默认可运行 demo。
 
 ## 安装与运行前提
 
@@ -32,6 +32,8 @@ from physical_ai_data import (
     export_candidates_csv,
     export_training_eval_draft,
     convert_to_rerun,
+    assess_h300_sample_readiness,
+    inspect_sdk_environment,
 )
 ```
 
@@ -42,6 +44,8 @@ from physical_ai_data import (
 | `export_candidates_csv(package_root, output_csv=None, min_score=0.5)` | `physical_ai_data.export_candidates_csv` | 已存在的 package | `Path` | 写入 `output_csv`，默认 `package_root/derived/candidates.csv` |
 | `export_training_eval_draft(package_root, output_dir=None, split="unspecified")` | `physical_ai_data.export_training_eval_draft` | 已存在的 package；`split` 只能是 `unspecified`、`train`、`eval`、`validation`、`test`、`holdout` | `Path` | 写入 draft 目录，默认 `package_root/derived/training_eval`；可能生成候选样本中间文件 |
 | `convert_to_rerun(package_root, output_rrd)` | `physical_ai_data.convert_to_rerun` | 已存在的 package | `Path` | 写入 `.rrd` 文件 |
+| `assess_h300_sample_readiness(clean_root, raw_root=None)` | `physical_ai_data.assess_h300_sample_readiness` | 候选 H300 `weld_workcell` Clean Zone，可选 Raw root | `H300ReadinessReport` | 无 |
+| `inspect_sdk_environment()` | `physical_ai_data.inspect_sdk_environment` | 当前 Python/CLI 环境 | `SdkEnvironmentReport` | 无 |
 | `run_weld_workcell_pipeline(clean_root, output_dir, ...)` | `physical_ai_data.pipelines.run_weld_workcell_pipeline` | `weld_workcell` Clean Zone 根目录 | `PipelineResult` | 写 package；可选写 candidates、training draft、`.rrd` |
 | `run_import(importer, ImportRequest(...))` | `physical_ai_data.importers.run_import` | importer contract 输入 | `ImportResult` | 由 importer 决定；`WeldWorkcellPackageImporter` 会写 package |
 | `generate_stage8_h300_synthetic_demo(output_root, frame_count=5)` | `physical_ai_data.stage8_h300_demo.generate_stage8_h300_synthetic_demo` | demo 输出根目录 | Stage 8 fixture result | 写 synthetic Raw/Clean fixture；这是 demo helper，不是顶层 API |
@@ -65,6 +69,11 @@ from physical_ai_data import (
 - `candidates_csv: Path | None`
 - `training_draft_dir: Path | None`
 - `rrd_path: Path | None`
+- `to_dict()`：返回与 CLI pipeline JSON 一致的输出索引，包含 `package_root`、`validation`、`summary`、`candidates_csv`、`training_draft_dir` 和 `rrd_path`。
+
+`H300ReadinessReport` 来自 `physical_ai_data.stage11_readiness`，可通过顶层 `assess_h300_sample_readiness(...)` 获取，用于真实/脱敏替换前检查候选 Clean/Raw roots。
+
+`SdkEnvironmentReport` 来自 `physical_ai_data.environment`，可通过顶层 `inspect_sdk_environment()` 或 `physical-ai-package doctor --json` 获取，用于定位旧 editable install、console entrypoint 和可选依赖状态。
 
 `ImportRequest` 来自 `physical_ai_data.importers`：
 
@@ -101,6 +110,7 @@ result = run_weld_workcell_pipeline(
 print(result.validation.ok)
 print(result.summary)
 print(result.candidates_csv)
+print(result.to_dict())
 ```
 
 默认行为：
@@ -167,6 +177,8 @@ print(result.package_root)
 | `physical-ai-package export-candidates PACKAGE` | `physical_ai_data.export_candidates_csv(package_root, ...)` |
 | `physical-ai-package export-training-draft PACKAGE --split eval` | `physical_ai_data.export_training_eval_draft(package_root, split="eval")` |
 | `physical-ai-package convert-rerun PACKAGE --output-rrd out.rrd` | `physical_ai_data.convert_to_rerun(package_root, output_rrd)` |
+| `physical-ai-package assess-h300-readiness --clean-root CLEAN --raw-root RAW --json` | `physical_ai_data.assess_h300_sample_readiness(clean_root, raw_root=...)` |
+| `physical-ai-package doctor --json` | `physical_ai_data.inspect_sdk_environment()` |
 | `physical-ai-package run-weld-workcell --clean-root CLEAN --output-dir PACKAGE ...` | `physical_ai_data.pipelines.run_weld_workcell_pipeline(...)` |
 | `python scripts/generate_stage8_h300_synthetic_demo.py ...` | `physical_ai_data.stage8_h300_demo.generate_stage8_h300_synthetic_demo(...)`，demo helper |
 | `python scripts/physical_ai_package.py ...` | 兼容 CLI wrapper，映射同上 |
@@ -175,8 +187,10 @@ print(result.package_root)
 
 - `examples/sdk_existing_package_ops.py`：生成一个 sample package，并调用顶层 SDK 的 validate、summary、candidates、training draft、Rerun 转换。
 - `examples/sdk_pipeline_stage8.py`：生成 Stage 8 H300 synthetic fixture，并调用 `run_weld_workcell_pipeline`。
+- `examples/sdk_real_data_onboarding.py`：candidate real/de-identified Clean/Raw root 的 Stage 11.1 onboarding 模板，串起 readiness、pipeline smoke 和输出索引。
 - `examples/sdk_low_level_importer.py`：直接使用 `ImportRequest`、`run_import` 和 `WeldWorkcellPackageImporter`。
 - `examples/cli_json_smoke.sh`：CLI JSON smoke，适合 adoption 最小验收。
+- `docs/sdk/real_data_onboarding.md`：真实/脱敏候选 Clean Zone 的 real-data onboarding guide。
 - `docs/sdk/stage8_pipeline_walkthrough.md`：不依赖 Jupyter 的 notebook-style walkthrough。
 - `docs/sdk/adoption_checklist.md`：SDK adoption checklist。
 - `docs/sdk/demo_ui_evaluation.md`：demo UI 是否进入下一阶段的评估口径。
@@ -204,3 +218,5 @@ physical-ai-package run-weld-workcell \
 - plugin system。
 
 Stage 8 H300 数据仍是 synthetic demo/readiness fixture；真实或脱敏 H300 样本到位后，需要先按 `docs/stage8/h300_synthetic_to_real_gap_register.md` 逐项替换和验证，再决定是否进入 connector、DB/schema、Web platform 或现场协议工作。
+
+Stage 11.1 的 `docs/sdk/real_data_onboarding.md` 和 `examples/sdk_real_data_onboarding.py` 只提供候选真实/脱敏 Clean Zone 模板，不代表仓库已有真实 H300 样本或真实数据试点完成。
