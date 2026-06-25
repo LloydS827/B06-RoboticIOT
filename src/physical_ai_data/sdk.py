@@ -5,6 +5,12 @@ from pathlib import Path
 from physical_ai_data.candidates import export_candidates, summarize_package
 from physical_ai_data.rerun_adapter import write_rrd
 from physical_ai_data.schema import ValidationResult
+from physical_ai_data.stage11_readiness import (
+    GapStatus,
+    H300ReadinessReport,
+    ReadinessCheck,
+    assess_h300_sample_readiness,
+)
 from physical_ai_data.training_export import export_training_eval_draft as _export_training_eval_draft
 from physical_ai_data.validation import validate_package
 
@@ -14,6 +20,10 @@ __all__ = [
     "export_candidates_csv",
     "convert_to_rerun",
     "export_training_eval_draft",
+    "GapStatus",
+    "H300ReadinessReport",
+    "ReadinessCheck",
+    "assess_h300_sample_readiness",
 ]
 
 

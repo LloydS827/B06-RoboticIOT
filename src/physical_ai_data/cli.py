@@ -289,23 +289,7 @@ def _validation_payload(package: Path, result: ValidationResult) -> dict[str, ob
 
 
 def _pipeline_payload(result: PipelineResult) -> dict[str, object]:
-    return {
-        "package_root": str(result.package_root),
-        "validation": {
-            "ok": result.validation.ok,
-            "summary": result.validation.summary,
-            "errors": [asdict(error) for error in result.validation.errors],
-            "warnings": [asdict(warning) for warning in result.validation.warnings],
-        },
-        "summary": result.summary,
-        "candidates_csv": _optional_path(result.candidates_csv),
-        "training_draft_dir": _optional_path(result.training_draft_dir),
-        "rrd_path": _optional_path(result.rrd_path),
-    }
-
-
-def _optional_path(path: Path | None) -> str | None:
-    return str(path) if path is not None else None
+    return result.to_dict()
 
 
 def _normalize_training_split(split: str | None) -> str | None:

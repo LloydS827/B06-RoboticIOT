@@ -40,6 +40,29 @@ def test_run_weld_workcell_pipeline_generates_package_outputs(tmp_path: Path):
     assert result.rrd_path.is_file()
 
 
+def test_pipeline_result_to_dict_matches_cli_payload_contract(tmp_path: Path):
+    from physical_ai_data.pipelines import run_weld_workcell_pipeline
+
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    package_root = tmp_path / "package"
+    output_rrd = tmp_path / "package.rrd"
+
+    result = run_weld_workcell_pipeline(
+        clean_root=fixture.clean_root,
+        output_dir=package_root,
+        training_split="eval",
+        output_rrd=output_rrd,
+    )
+
+    payload = result.to_dict()
+    assert payload["package_root"] == str(package_root)
+    assert payload["validation"]["ok"] is True
+    assert payload["summary"]["frame_count"] == 5
+    assert payload["candidates_csv"] == str(package_root / "derived" / "candidates.csv")
+    assert payload["training_draft_dir"] == str(package_root / "derived" / "training_eval")
+    assert payload["rrd_path"] == str(output_rrd)
+
+
 def test_run_weld_workcell_pipeline_can_skip_optional_outputs(tmp_path: Path):
     from physical_ai_data.pipelines import run_weld_workcell_pipeline
 

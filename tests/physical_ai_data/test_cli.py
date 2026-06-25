@@ -241,6 +241,25 @@ def test_cli_run_weld_workcell_json_handles_disabled_outputs(monkeypatch, tmp_pa
     assert payload["rrd_path"] is None
 
 
+def test_cli_pipeline_payload_delegates_to_result_to_dict(monkeypatch, tmp_path: Path):
+    from physical_ai_data import cli
+    from physical_ai_data.pipelines import PipelineResult
+
+    result = PipelineResult(
+        package_root=tmp_path / "package",
+        validation=ValidationResult(summary={"frame_count": 5}),
+        summary={"frame_count": 5},
+        candidates_csv=None,
+        training_draft_dir=None,
+        rrd_path=None,
+    )
+    sentinel = {"sentinel": object()}
+
+    monkeypatch.setattr(PipelineResult, "to_dict", lambda self: sentinel)
+
+    assert cli._pipeline_payload(result) is sentinel
+
+
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
