@@ -5,6 +5,9 @@ from pathlib import Path
 from physical_ai_data.environment import inspect_sdk_environment
 
 
+ROOT = Path(__file__).resolve().parents[2]
+
+
 def test_inspect_sdk_environment_reports_current_package_path():
     report = inspect_sdk_environment()
     payload = report.to_dict()
@@ -43,6 +46,25 @@ def test_inspect_sdk_environment_errors_when_package_file_is_outside_current_rep
     stale_package.write_text('"""stale package"""', encoding="utf-8")
 
     monkeypatch.setattr(physical_ai_data, "__file__", str(stale_package))
+
+    report = environment.inspect_sdk_environment()
+
+    assert report.ok is False
+    assert any("current working tree" in error for error in report.errors)
+
+
+def test_inspect_sdk_environment_errors_from_repo_subdirectory_when_package_is_stale(
+    monkeypatch,
+    tmp_path: Path,
+):
+    import physical_ai_data
+    import physical_ai_data.environment as environment
+
+    stale_package = tmp_path / "stale-worktree" / "src" / "physical_ai_data" / "__init__.py"
+    stale_package.parent.mkdir(parents=True)
+    stale_package.write_text('"""stale package"""', encoding="utf-8")
+    monkeypatch.setattr(physical_ai_data, "__file__", str(stale_package))
+    monkeypatch.chdir(ROOT / "docs" / "sdk")
 
     report = environment.inspect_sdk_environment()
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -33,15 +34,25 @@ def main(argv: list[str] | None = None) -> int:
         _print_payload(report=report.to_dict(), pipeline=None, error=None)
         return 2
 
+    package_dir = args.output_root / "package"
+    package_existed_before = package_dir.exists()
+    rrd_existed_before = bool(args.output_rrd and args.output_rrd.exists())
+
     try:
         result = run_weld_workcell_pipeline(
             clean_root=args.clean_root,
-            output_dir=args.output_root / "package",
+            output_dir=package_dir,
             copy_images=not args.no_copy_images,
             training_split=args.training_split,
             output_rrd=args.output_rrd,
         )
     except Exception as exc:
+        _cleanup_failed_outputs(
+            package_dir=package_dir,
+            package_existed_before=package_existed_before,
+            output_rrd=args.output_rrd,
+            rrd_existed_before=rrd_existed_before,
+        )
         _print_payload(report=report.to_dict(), pipeline=None, error=str(exc))
         return 1
 
@@ -78,6 +89,19 @@ def _output_index(pipeline: dict[str, object] | None) -> dict[str, object] | Non
         "training_draft_dir": pipeline["training_draft_dir"],
         "rrd_path": pipeline["rrd_path"],
     }
+
+
+def _cleanup_failed_outputs(
+    *,
+    package_dir: Path,
+    package_existed_before: bool,
+    output_rrd: Path | None,
+    rrd_existed_before: bool,
+) -> None:
+    if not package_existed_before and package_dir.exists():
+        shutil.rmtree(package_dir)
+    if output_rrd is not None and not rrd_existed_before and output_rrd.exists():
+        output_rrd.unlink()
 
 
 def _next_steps(overall_status: str, *, error: str | None = None) -> list[str]:

@@ -8,7 +8,7 @@
 
 ## 1. 环境检查
 
-先从 repo root 确认当前 Python import path、console entrypoint 和可选依赖状态：
+先从 repo root 或其子目录确认当前 Python import path、console entrypoint 和可选依赖状态：
 
 ```bash
 physical-ai-package doctor --json
@@ -17,7 +17,7 @@ physical-ai-package doctor --json
 重点查看：
 
 - `ok`：为 `true` 表示 SDK 环境没有阻断错误；为 `false` 时先修环境。
-- `package_file`：应指向当前 worktree 或当前 repo 的 `src/physical_ai_data/__init__.py`，不要指向旧 editable install；若当前 repo root 存在 `src/physical_ai_data` 但 import path 指向其他工作树，`doctor` 会返回错误。
+- `package_file`：应指向当前 worktree 或当前 repo 的 `src/physical_ai_data/__init__.py`，不要指向旧 editable install；若当前 repo 或其父目录链上存在 `src/physical_ai_data` 但 import path 指向其他工作树，`doctor` 会返回错误。
 - `console_entrypoint`：应能解析到当前环境中的 `physical-ai-package`。
 - `warnings`：`rerun`、`lerobot` 这类可选依赖缺失只影响对应能力，不代表 Clean Zone readiness 不能运行。
 

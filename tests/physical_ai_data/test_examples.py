@@ -279,3 +279,37 @@ def test_sdk_real_data_onboarding_example_reports_pipeline_failure_as_json(tmp_p
     assert payload["output_index"] is None
     assert "invalid-split" in payload["error"]
     assert "Traceback" not in result.stderr
+    assert not (output_root / "package").exists()
+
+
+def test_sdk_real_data_onboarding_example_removes_failed_rrd_output(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "fixture", frame_count=5)
+    output_root = tmp_path / "onboarding"
+    output_rrd = tmp_path / "failed-package.rrd"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "examples/sdk_real_data_onboarding.py",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--raw-root",
+            str(fixture.raw_root),
+            "--output-root",
+            str(output_root),
+            "--training-split",
+            "invalid-split",
+            "--output-rrd",
+            str(output_rrd),
+        ],
+        cwd=ROOT,
+        env=_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["output_index"] is None
+    assert not output_rrd.exists()

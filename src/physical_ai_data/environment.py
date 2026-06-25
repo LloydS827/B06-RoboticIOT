@@ -62,6 +62,7 @@ def inspect_sdk_environment() -> SdkEnvironmentReport:
     warnings: list[str] = []
     errors: list[str] = []
     cwd = Path.cwd()
+    current_tree_root = _find_current_tree_root(cwd)
 
     package_file = getattr(physical_ai_data, "__file__", None)
     package_path_exists = bool(package_file and Path(package_file).exists())
@@ -69,7 +70,7 @@ def inspect_sdk_environment() -> SdkEnvironmentReport:
         errors.append("physical_ai_data.__file__ is missing")
     elif not package_path_exists:
         errors.append(f"physical_ai_data.__file__ path does not exist: {package_file}")
-    elif _current_tree_has_sdk_source(cwd) and not _is_relative_to(Path(package_file), cwd):
+    elif current_tree_root is not None and not _is_relative_to(Path(package_file), current_tree_root):
         errors.append(
             "physical_ai_data.__file__ is outside the current working tree: "
             f"{package_file}"
@@ -109,8 +110,11 @@ def _inspect_optional_dependency(name: str) -> OptionalDependencyStatus:
     return OptionalDependencyStatus(name=name, installed=installed)
 
 
-def _current_tree_has_sdk_source(cwd: Path) -> bool:
-    return (cwd / "src" / "physical_ai_data").is_dir()
+def _find_current_tree_root(cwd: Path) -> Path | None:
+    for candidate in (cwd, *cwd.parents):
+        if (candidate / "src" / "physical_ai_data").is_dir():
+            return candidate
+    return None
 
 
 def _is_relative_to(path: Path, parent: Path) -> bool:
