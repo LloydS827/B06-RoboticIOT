@@ -113,7 +113,7 @@ physical-ai-package run-weld-workcell \
 
 ## 5. 输出索引
 
-Stage 11.1 推荐使用 `PipelineResult.to_dict()` 或 CLI JSON 的同一结构记录输出索引：
+Stage 11.1 推荐使用 `examples/sdk_real_data_onboarding.py` JSON 中的 `output_index`，或使用 `PipelineResult.to_dict()` / CLI JSON 的同一结构记录输出索引：
 
 ```python
 from physical_ai_data.pipelines import run_weld_workcell_pipeline
@@ -129,6 +129,7 @@ payload = result.to_dict()
 
 至少检查这些字段：
 
+- `output_index`：onboarding example 输出的显式索引，包含 package、candidate、training draft 和 `.rrd` 路径；若 readiness `blocked` 或 pipeline 失败，该字段为 `null`。
 - `package_root`：生成的 Physical AI Package 根目录。
 - `validation.ok`、`validation.errors`、`validation.warnings`：package 校验结果。
 - `summary`：帧数、事件、标签、指标和 artifact 引用概要。

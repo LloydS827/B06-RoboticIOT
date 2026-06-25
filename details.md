@@ -307,13 +307,21 @@
 
 ### 2026-06-25
 
-- 完成 Stage 11.1 SDK real-data onboarding hardening 的文档和项目状态更新：本阶段只把已有 SDK/CLI 能力整理成 candidate real/de-identified Clean Zone 的工程 onboarding 入口，不声称仓库已有真实 H300 样本，也不声称真实数据试点完成。
-- Stage 11.1 文档口径：
-  - `physical-ai-package doctor --json` 作为真实/脱敏候选样本整理前的环境检查入口，用于确认当前 SDK import path、console entrypoint 和可选依赖状态。
-  - `docs/sdk/real_data_onboarding.md` 作为主 guide，串起环境检查、输入准备、`assess_h300_sample_readiness(...)` readiness、pipeline smoke、输出索引、失败分流和边界。
-  - `examples/sdk_real_data_onboarding.py` 作为候选 Clean/Raw root 模板，串起 readiness、pipeline smoke 和 `PipelineResult.to_dict()` 输出索引。
+- 完成 Stage 11.1 SDK real-data onboarding hardening：本阶段把 Stage 9/10/11 的 SDK-first 主链路进一步产品化为 candidate real/de-identified Clean Zone 的工程 onboarding 入口，不声称仓库已有真实 H300 样本，也不声称真实数据试点完成。
+- Stage 11.1 代码与示例更新：
+  - 顶层 `physical_ai_data` 和 `physical_ai_data.sdk` 现在导出 `assess_h300_sample_readiness(...)`、`H300ReadinessReport`、`ReadinessCheck`、`GapStatus`、`inspect_sdk_environment()` 和 `SdkEnvironmentReport`。
+  - `PipelineResult.to_dict()` 作为 SDK/CLI 共享输出索引结构，CLI `run-weld-workcell --json` 复用该结构。
+  - `physical-ai-package doctor --json` 作为候选样本整理前的环境检查入口，用于确认当前 SDK import path、console entrypoint 和可选依赖状态；旧 editable install 指向不存在路径时会返回非零 report。
+  - `examples/sdk_real_data_onboarding.py` 作为候选 Clean/Raw root 模板，串起 readiness、pipeline smoke、`output_index`、错误 JSON 和 next steps；readiness `blocked` 时返回 exit 2 且不写 package。
+- Stage 11.1 文档更新：
+  - `docs/sdk/real_data_onboarding.md` 作为主 guide，串起环境检查、输入准备、readiness、pipeline smoke、输出索引、失败分流和边界。
   - README、`docs/sdk/README.md` 和 `docs/sdk/adoption_checklist.md` 已把 doctor、real_data_onboarding guide、sdk_real_data_onboarding、顶层 readiness API 和 `PipelineResult.to_dict()` 纳入 SDK 主入口。
-- Stage 11.1 本轮只更新文档和状态记录，未修改生产代码或测试；本轮文档范围包括 `docs/sdk/real_data_onboarding.md`、`docs/sdk/README.md`、`docs/sdk/adoption_checklist.md`、`README.md` 和 `details.md`。
+- Stage 11.1 本轮新增/更新文件包括：`src/physical_ai_data/environment.py`、`src/physical_ai_data/sdk.py`、`src/physical_ai_data/__init__.py`、`src/physical_ai_data/pipelines.py`、`src/physical_ai_data/cli.py`、`examples/sdk_real_data_onboarding.py`、相关 tests、`docs/sdk/real_data_onboarding.md`、README、SDK docs、details、spec 和 plan。
+- Stage 11.1 最终验证结果：
+  - focused verification：`python -m pytest tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_environment.py tests/physical_ai_data/test_pipelines.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_examples.py -q` 返回 `53 passed in 8.23s`。
+  - full test suite：`python -m pytest -q` 返回 `239 passed in 9.97s`。
+  - manual doctor smoke：`physical-ai-package doctor --json` exit 0，返回 `ok: true`，`package_file` 指向当前 Stage 11.1 worktree，`lerobot` 缺失仅作为 optional dependency warning。
+  - manual onboarding smoke：先生成 `/tmp/stage11_1_h300_candidate`，再运行 `python examples/sdk_real_data_onboarding.py --clean-root /tmp/stage11_1_h300_candidate/clean/weld_workcell --raw-root /tmp/stage11_1_h300_candidate/raw --output-root /tmp/stage11_1_h300_candidate_onboarding --training-split eval --output-rrd /tmp/stage11_1_h300_candidate_onboarding/package.rrd`，exit 0，返回 `readiness.overall_status: review_required`、`pipeline.validation.ok: true` 和包含 `package_root`、`candidates_csv`、`training_draft_dir`、`rrd_path` 的 `output_index`。
 - Stage 11.1 边界保持不变：不实现 production connector、TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema、demo UI、H300 现场协议、A02 converter 或 Physical AI Package schema changes。
 - 下一步仍是：至少一条脱敏 H300 最小作业窗口样本完成访问边界、提交边界和受控目录确认后，才进入 Stage 12 first de-identified H300 sample replacement pilot。
 

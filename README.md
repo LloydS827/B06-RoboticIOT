@@ -72,7 +72,7 @@ Stage 10 adoption path 建议按这个顺序执行：
 4. 运行 [SDK pipeline example](examples/sdk_pipeline_stage8.py)、[existing package operations example](examples/sdk_existing_package_ops.py)、[low-level importer example](examples/sdk_low_level_importer.py) 或 `bash examples/cli_json_smoke.sh /tmp/b06_stage10_cli_json_smoke`。
 5. 按 [Stage 8 pipeline walkthrough](docs/sdk/stage8_pipeline_walkthrough.md) 复核完整 adoption flow。
 6. 替换为真实/脱敏 H300 Clean Zone 前，按 [SDK real-data onboarding guide](docs/sdk/real_data_onboarding.md) 使用 `assess_h300_sample_readiness(...)` 或 `physical-ai-package assess-h300-readiness --clean-root ... --raw-root ... --json` 检查候选 Clean/Raw roots。
-7. 若 readiness 不是 `blocked`，可用 [sdk_real_data_onboarding.py](examples/sdk_real_data_onboarding.py) 做 candidate real/de-identified pipeline smoke，并用 `PipelineResult.to_dict()` 记录输出索引。
+7. 若 readiness 不是 `blocked`，可用 [sdk_real_data_onboarding.py](examples/sdk_real_data_onboarding.py) 做 candidate real/de-identified pipeline smoke，并用脚本 JSON 中的 `output_index` 或 `PipelineResult.to_dict()` 记录输出索引。
 8. 根据 Stage 11 report 和 [Stage 8 H300 synthetic-to-real gap register](docs/stage8/h300_synthetic_to_real_gap_register.md) 人工检查字段、脱敏、权限和证据缺口，再决定是否进入受控目录中的真实/脱敏样本替换 smoke。
 
 Stage 10 只强化 SDK/CLI adoption，不新增 production connector、DB/schema、完整 Web 平台或 H300 现场协议。轻量 demo UI 仅保留为后续评估项，口径见 [demo UI evaluation](docs/sdk/demo_ui_evaluation.md)。
