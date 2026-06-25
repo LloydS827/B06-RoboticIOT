@@ -318,9 +318,9 @@
   - README、`docs/sdk/README.md` 和 `docs/sdk/adoption_checklist.md` 已把 doctor、real_data_onboarding guide、sdk_real_data_onboarding、顶层 readiness API 和 `PipelineResult.to_dict()` 纳入 SDK 主入口。
 - Stage 11.1 本轮新增/更新文件包括：`src/physical_ai_data/environment.py`、`src/physical_ai_data/sdk.py`、`src/physical_ai_data/__init__.py`、`src/physical_ai_data/pipelines.py`、`src/physical_ai_data/cli.py`、`examples/sdk_real_data_onboarding.py`、相关 tests、`docs/sdk/real_data_onboarding.md`、README、SDK docs、details、spec 和 plan。
 - Stage 11.1 最终验证结果：
-  - focused verification：`python -m pytest tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_environment.py tests/physical_ai_data/test_pipelines.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_examples.py -q` 返回 `53 passed in 8.23s`。
-  - full test suite：`python -m pytest -q` 返回 `239 passed in 9.97s`。
-  - manual doctor smoke：`physical-ai-package doctor --json` exit 0，返回 `ok: true`，`package_file` 指向当前 Stage 11.1 worktree，`lerobot` 缺失仅作为 optional dependency warning。
+  - focused verification：`python -m pytest tests/physical_ai_data/test_sdk.py tests/physical_ai_data/test_environment.py tests/physical_ai_data/test_pipelines.py tests/physical_ai_data/test_cli.py tests/physical_ai_data/test_examples.py -q` 返回 `54 passed in 7.88s`。
+  - full test suite：`python -m pytest -q` 返回 `240 passed in 9.29s`。
+  - manual doctor smoke：`physical-ai-package doctor --json` exit 0，返回 `ok: true`，`package_file` 指向当前 Stage 11.1 worktree，且 doctor 测试覆盖 stale editable import 指向其他工作树时返回 error；`lerobot` 缺失仅作为 optional dependency warning。
   - manual onboarding smoke：先生成 `/tmp/stage11_1_h300_candidate`，再运行 `python examples/sdk_real_data_onboarding.py --clean-root /tmp/stage11_1_h300_candidate/clean/weld_workcell --raw-root /tmp/stage11_1_h300_candidate/raw --output-root /tmp/stage11_1_h300_candidate_onboarding --training-split eval --output-rrd /tmp/stage11_1_h300_candidate_onboarding/package.rrd`，exit 0，返回 `readiness.overall_status: review_required`、`pipeline.validation.ok: true` 和包含 `package_root`、`candidates_csv`、`training_draft_dir`、`rrd_path` 的 `output_index`。
 - Stage 11.1 边界保持不变：不实现 production connector、TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema、demo UI、H300 现场协议、A02 converter 或 Physical AI Package schema changes。
 - 下一步仍是：至少一条脱敏 H300 最小作业窗口样本完成访问边界、提交边界和受控目录确认后，才进入 Stage 12 first de-identified H300 sample replacement pilot。
