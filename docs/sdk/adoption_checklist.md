@@ -12,6 +12,13 @@ python -m pip install -e ".[dev]"
 
 - 后续命令都从 repo root 运行。
 - 如果使用临时输出，优先写到 `/tmp/...` 或 `artifacts/stage8/...` 这类可再生成路径。
+- 运行 SDK environment doctor，确认 editable install、import path 和 console entrypoint 指向当前仓库：
+
+```bash
+physical-ai-package doctor --json
+```
+
+如果 `doctor` 报错，或 `package_file` 指向旧 worktree，先修环境后再进入 demo 或 candidate real/de-identified onboarding。
 
 ## 2. Synthetic demo 路径
 
@@ -30,16 +37,25 @@ python scripts/generate_stage8_h300_synthetic_demo.py \
 
 Python SDK 路径可参考 `examples/sdk_pipeline_stage8.py`。
 
-## 3. Clean Zone replacement 路径
+## 3. Candidate real/de-identified Clean Zone replacement 路径
 
-替换为真实或脱敏数据时，不直接改 SDK schema，也不先做 production connector。先准备一个符合 `weld_workcell` contract 的 Clean Zone 目录：
+替换为真实或脱敏数据时，不直接改 SDK schema，也不先做 production connector。先阅读 [SDK real-data onboarding guide](real_data_onboarding.md)，再准备一个符合 `weld_workcell` contract 的 Clean Zone 目录：
 
 - 必需文件：`job.json`、`frames.csv`、`process.csv`、`events.csv`
 - 可选文件：`review_labels.csv`
 - 图片路径：`frames.csv` 中的 `image_path` 能从 Clean Zone root 解析
 - 输出目录：不要与 Clean Zone root 相同
 
-最小替换方式是把 `run_weld_workcell_pipeline(clean_root=...)` 的 `clean_root` 指向新的 Clean Zone。
+最小替换方式不是直接跑 pipeline，而是先执行 readiness：
+
+```bash
+physical-ai-package assess-h300-readiness \
+  --clean-root path/to/candidate/clean/weld_workcell \
+  --raw-root path/to/candidate/raw \
+  --json
+```
+
+如果 `overall_status=blocked`，先修 Clean Zone，再重新运行 readiness；不要继续 pipeline smoke。如果状态不是 `blocked`，再使用 `examples/sdk_real_data_onboarding.py` 或 `physical-ai-package run-weld-workcell` 做受控 smoke。
 
 ## 4. 最小验收命令
 
@@ -76,6 +92,7 @@ python examples/sdk_low_level_importer.py --output-root /tmp/b06_stage10_low_lev
 - candidates：`derived/candidates.csv` 存在，或者明确设置 `export_candidates=False` 并接受 `PipelineResult.candidates_csv is None`。
 - training draft：`derived/training_eval` 存在，或者明确设置 `training_split=None`。
 - `.rrd`：如果需要 Rerun 回放，`output_rrd` 指向的文件存在；否则接受 `PipelineResult.rrd_path is None`。
+- 输出索引：SDK 路径优先记录 `PipelineResult.to_dict()`，CLI 路径记录同等 JSON 字段。
 
 ## 6. 数据敏感性和不提交边界
 
