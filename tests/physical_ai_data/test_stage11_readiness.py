@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 from pathlib import Path
 
 from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
@@ -19,6 +20,17 @@ def _rewrite_first_image_path(clean_root: Path, image_path: str) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _remove_csv_column(path: Path, column: str) -> None:
+    rows = list(csv.DictReader(path.open(newline="", encoding="utf-8")))
+    fieldnames = [field for field in rows[0] if field != column]
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            row.pop(column, None)
+            writer.writerow(row)
 
 
 def test_stage11_readiness_stage8_fixture_with_raw_is_review_required(tmp_path: Path):
@@ -52,6 +64,32 @@ def test_stage11_readiness_blocks_missing_required_clean_file(tmp_path: Path):
 
     assert report.overall_status == "blocked"
     assert any(check.check_id == "clean_required:process.csv" and check.status == "block" for check in report.checks)
+
+
+def test_stage11_readiness_blocks_missing_importer_required_job_field(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    job_path = fixture.clean_root / "job.json"
+    job = json.loads(job_path.read_text(encoding="utf-8"))
+    job.pop("station_id")
+    job_path.write_text(json.dumps(job), encoding="utf-8")
+
+    report = assess_h300_sample_readiness(fixture.clean_root, raw_root=fixture.raw_root)
+
+    assert report.overall_status == "blocked"
+    assert any(check.check_id == "job:required_fields" and check.status == "block" for check in report.checks)
+
+
+def test_stage11_readiness_blocks_missing_importer_required_process_column(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
+    _remove_csv_column(fixture.clean_root / "process.csv", "wire_feed_mpm")
+
+    report = assess_h300_sample_readiness(fixture.clean_root, raw_root=fixture.raw_root)
+
+    assert report.overall_status == "blocked"
+    assert any(
+        check.check_id == "process.csv:required_columns" and check.status == "block"
+        for check in report.checks
+    )
 
 
 def test_stage11_readiness_blocks_missing_image_reference(tmp_path: Path):
@@ -121,15 +159,7 @@ def test_stage11_readiness_raw_artifact_gaps_do_not_block_pipeline_smoke(tmp_pat
 
 def test_stage11_readiness_blocks_missing_timestamp_column(tmp_path: Path):
     fixture = generate_stage8_h300_synthetic_demo(tmp_path / "stage8_demo")
-    frames_path = fixture.clean_root / "frames.csv"
-    rows = list(csv.DictReader(frames_path.open(newline="", encoding="utf-8")))
-    fieldnames = [field for field in rows[0] if field != "timestamp_s"]
-    with frames_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            row.pop("timestamp_s", None)
-            writer.writerow(row)
+    _remove_csv_column(fixture.clean_root / "frames.csv", "timestamp_s")
 
     report = assess_h300_sample_readiness(fixture.clean_root)
 

@@ -114,9 +114,10 @@ Stage 11 采用方案 B：**文档 + 轻量 readiness checker**。
 
 - 必需 Clean Zone 文件：`job.json`、`frames.csv`、`process.csv`、`events.csv`。
 - 可选 Clean Zone 文件：`review_labels.csv`。
-- `job.json` 必须可解析，并至少包含任务/作业窗口类字段中的一个可用线索。
-- `frames.csv` 必须可解析，至少有一行，并包含 `timestamp_s` 与 TCP pose 相关列；如存在非空 `image_path`，检查相对路径不越界且文件存在。空 `image_path` 沿用现有 `weld_workcell` importer contract，表示该帧无可交付图片，不单独阻塞 readiness。
-- `process.csv` 与 `events.csv` 必须可解析，至少检查 header。
+- `job.json` 必须可解析，至少包含任务/作业窗口类字段中的一个可用线索，并满足现有 `weld_workcell` importer required fields。
+- `frames.csv` 必须可解析，至少有一行，并包含现有 `weld_workcell` importer required columns、`timestamp_s` 与 TCP pose 相关列；如存在非空 `image_path`，检查相对路径不越界且文件存在。空 `image_path` 沿用现有 `weld_workcell` importer contract，表示该帧无可交付图片，不单独阻塞 readiness。
+- `process.csv` 与 `events.csv` 必须可解析，并满足现有 `weld_workcell` importer required columns。
+- 若可选 `review_labels.csv` 存在，也必须满足现有 `weld_workcell` importer required columns。
 - 如提供 `raw_root`，读取 `manifest.raw.json` 和已知 Stage 8 source artifact 路径，作为 G-003、G-004、G-005、G-011、G-012 的评审证据。
 - 第一版不支持新的 onsite-only 图片声明格式；若非空 `image_path` 目标文件缺失，统一按 Clean contract 阻塞处理。后续若真实样本证明必须支持 onsite-only 引用，再单独设计字段或 metadata 扩展。
 - checker 不尝试验证客户字段真实性、脱敏充分性、坐标系数学正确性、时钟同步质量或 A02 evidence 业务可用性。

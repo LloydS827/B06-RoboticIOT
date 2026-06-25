@@ -6,6 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from physical_ai_data.weld_workcell_importer import (
+    EVENT_REQUIRED_COLUMNS,
+    FRAME_REQUIRED_COLUMNS,
+    JOB_REQUIRED_FIELDS,
+    LABEL_REQUIRED_COLUMNS,
+    PROCESS_REQUIRED_COLUMNS,
+)
+
 
 CHECK_PASS = "pass"
 CHECK_REVIEW = "review"
@@ -99,6 +107,7 @@ def assess_h300_sample_readiness(
     required_present = _check_required_clean_files(clean_path, checks)
     job_payload = _load_job(clean_path / "job.json")
     job_id_clue_present = _has_job_id_clue(job_payload)
+    job_required_fields_present = _has_required_fields(job_payload, JOB_REQUIRED_FIELDS)
     checks.append(
         ReadinessCheck(
             "job:id_fields",
@@ -106,6 +115,16 @@ def assess_h300_sample_readiness(
             "job.json contains a job/task/window identifier"
             if job_id_clue_present
             else "job.json must contain at least one job identifier clue",
+            str(clean_path / "job.json"),
+        )
+    )
+    checks.append(
+        ReadinessCheck(
+            "job:required_fields",
+            CHECK_PASS if job_required_fields_present else CHECK_BLOCK,
+            "job.json includes weld_workcell required fields"
+            if job_required_fields_present
+            else "job.json is missing weld_workcell required fields",
             str(clean_path / "job.json"),
         )
     )
@@ -149,18 +168,39 @@ def assess_h300_sample_readiness(
             str(clean_path / "frames.csv"),
         )
     )
+    frames_required_columns_ok = _check_required_columns(
+        frames_headers,
+        FRAME_REQUIRED_COLUMNS,
+        "frames:required_columns",
+        clean_path / "frames.csv",
+        checks,
+    )
 
     _check_frame_image_paths(clean_path, frames_rows, frames_headers, checks)
-    process_header_ok = _check_csv_header(clean_path / "process.csv", "process.csv", checks)
-    events_header_ok = _check_csv_header(clean_path / "events.csv", "events.csv", checks)
+    process_header_ok, process_headers = _check_csv_header(clean_path / "process.csv", "process.csv", checks)
+    process_required_columns_ok = _check_required_columns(
+        process_headers,
+        PROCESS_REQUIRED_COLUMNS,
+        "process.csv:required_columns",
+        clean_path / "process.csv",
+        checks,
+    )
+    events_header_ok, events_headers = _check_csv_header(clean_path / "events.csv", "events.csv", checks)
+    events_required_columns_ok = _check_required_columns(
+        events_headers,
+        EVENT_REQUIRED_COLUMNS,
+        "events.csv:required_columns",
+        clean_path / "events.csv",
+        checks,
+    )
     review_labels_exists = _check_review_labels(clean_path, checks)
     raw_evidence = _check_raw_evidence(raw_path, checks)
 
     gap_statuses = _build_gap_statuses(
-        job_id_clue_present=job_id_clue_present,
-        frames_timeline_ok=frames_has_timestamp and frames_has_tcp_pose,
-        process_header_ok=process_header_ok,
-        events_header_ok=events_header_ok,
+        job_ready=job_id_clue_present and job_required_fields_present,
+        frames_timeline_ok=frames_has_timestamp and frames_has_tcp_pose and frames_required_columns_ok,
+        process_ready=process_header_ok and process_required_columns_ok,
+        events_ready=events_header_ok and events_required_columns_ok,
         review_labels_exists=review_labels_exists,
         raw_evidence=raw_evidence,
     )
@@ -229,6 +269,32 @@ def _has_job_id_clue(payload: dict[str, Any]) -> bool:
     return False
 
 
+def _has_required_fields(payload: dict[str, Any], required_fields: list[str]) -> bool:
+    return all(payload.get(field) not in (None, "") for field in required_fields)
+
+
+def _check_required_columns(
+    headers: list[str] | None,
+    required_columns: list[str],
+    check_id: str,
+    path: Path,
+    checks: list[ReadinessCheck],
+) -> bool:
+    missing = [column for column in required_columns if not headers or column not in headers]
+    ok = not missing
+    checks.append(
+        ReadinessCheck(
+            check_id,
+            CHECK_PASS if ok else CHECK_BLOCK,
+            "CSV includes weld_workcell required columns"
+            if ok
+            else f"CSV missing weld_workcell required columns: {', '.join(missing)}",
+            str(path),
+        )
+    )
+    return ok
+
+
 def _check_frame_image_paths(
     clean_root: Path,
     rows: list[dict[str, str]],
@@ -269,7 +335,7 @@ def _path_exists_within_root(root: Path, relative_path: str) -> bool:
     return True
 
 
-def _check_csv_header(path: Path, label: str, checks: list[ReadinessCheck]) -> bool:
+def _check_csv_header(path: Path, label: str, checks: list[ReadinessCheck]) -> tuple[bool, list[str] | None]:
     _rows, headers, error = _read_csv_rows(path)
     header_ok = headers is not None and error is None
     checks.append(
@@ -280,12 +346,13 @@ def _check_csv_header(path: Path, label: str, checks: list[ReadinessCheck]) -> b
             str(path),
         )
     )
-    return header_ok
+    return header_ok, headers
 
 
 def _check_review_labels(clean_root: Path, checks: list[ReadinessCheck]) -> bool:
     path = clean_root / "review_labels.csv"
     exists = path.is_file()
+    _rows, headers, _error = _read_csv_rows(path) if exists else ([], None, None)
     checks.append(
         ReadinessCheck(
             "review_labels.csv",
@@ -296,6 +363,14 @@ def _check_review_labels(clean_root: Path, checks: list[ReadinessCheck]) -> bool
             str(path),
         )
     )
+    if exists:
+        _check_required_columns(
+            headers,
+            LABEL_REQUIRED_COLUMNS,
+            "review_labels.csv:required_columns",
+            path,
+            checks,
+        )
     return exists
 
 
@@ -345,15 +420,15 @@ def _raw_manifest_readable(path: Path) -> bool:
 
 def _build_gap_statuses(
     *,
-    job_id_clue_present: bool,
+    job_ready: bool,
     frames_timeline_ok: bool,
-    process_header_ok: bool,
-    events_header_ok: bool,
+    process_ready: bool,
+    events_ready: bool,
     review_labels_exists: bool,
     raw_evidence: dict[str, bool],
 ) -> list[GapStatus]:
     return [
-        _gap("G-001", GAP_READY if job_id_clue_present else GAP_BLOCKED, ["job.json"], "Confirm job/window identifiers."),
+        _gap("G-001", GAP_READY if job_ready else GAP_BLOCKED, ["job.json"], "Confirm job/window identifiers."),
         _gap("G-002", GAP_READY if frames_timeline_ok else GAP_BLOCKED, ["frames.csv"], "Confirm timestamp and TCP pose coverage."),
         _raw_gap("G-003", raw_evidence),
         _raw_gap("G-004", raw_evidence),
@@ -364,8 +439,8 @@ def _build_gap_statuses(
             ["review_labels.csv"] if review_labels_exists else [],
             "Review human labels and correction provenance.",
         ),
-        _gap("G-007", GAP_READY if process_header_ok else GAP_BLOCKED, ["process.csv"], "Review process telemetry columns."),
-        _gap("G-008", GAP_READY if events_header_ok else GAP_BLOCKED, ["events.csv"], "Review event log coverage."),
+        _gap("G-007", GAP_READY if process_ready else GAP_BLOCKED, ["process.csv"], "Review process telemetry columns."),
+        _gap("G-008", GAP_READY if events_ready else GAP_BLOCKED, ["events.csv"], "Review event log coverage."),
         _gap(
             "G-009",
             GAP_RAW_REVIEW if review_labels_exists or raw_evidence["G-009"] else GAP_BLOCKED,

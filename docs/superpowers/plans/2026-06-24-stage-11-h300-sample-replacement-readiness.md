@@ -245,15 +245,17 @@ Implementation details:
 - `job.json`:
   - If readable JSON and contains at least one `JOB_ID_KEYS` key either at top level or under `job`/`window`, add pass check.
   - If no ID clue, add block check `job:id_fields`.
+  - If any existing `weld_workcell` importer required field is missing, add block check `job:required_fields`.
 - `frames.csv`:
   - Parse with `csv.DictReader`.
   - Missing or empty headers -> block `frames:readable`.
   - No rows -> block `frames:rows`.
   - Missing `timestamp_s` -> block `frames:timestamp_s`.
   - Missing any `TCP_POSE_COLUMNS` -> block `frames:tcp_pose`.
+  - Missing any existing `weld_workcell` importer required column -> block `frames:required_columns`.
   - If `image_path` column exists, empty values are allowed and mean this frame has no image. Non-empty values must be relative, non-escaping, symlink-safe, and point to existing files; violations block `frames:image_path`.
-- `process.csv` and `events.csv`: parse headers; missing headers -> block `<file>:header`.
-- `review_labels.csv`: present -> review/pass check; absent -> review check, not block.
+- `process.csv` and `events.csv`: parse headers; missing headers -> block `<file>:header`; missing any existing `weld_workcell` importer required column -> block `<file>:required_columns`.
+- `review_labels.csv`: present -> review/pass check and required-column check; absent -> review check, not block.
 - Raw artifact evidence:
   - If `raw_root` is provided and `manifest.raw.json` is missing or unreadable, add a `review` check, not a `block` check.
   - Raw/source artifact gaps never make `overall_status` blocked by themselves; they are represented through gap statuses and review checks.
