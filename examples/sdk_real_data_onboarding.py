@@ -30,39 +30,62 @@ def main(argv: list[str] | None = None) -> int:
 
     report = assess_h300_sample_readiness(args.clean_root, raw_root=args.raw_root)
     if report.overall_status == "blocked":
-        print(
-            json.dumps(
-                {
-                    "readiness": report.to_dict(),
-                    "pipeline": None,
-                    "next_steps": _next_steps(report.overall_status),
-                },
-                indent=2,
-            )
-        )
+        _print_payload(report=report.to_dict(), pipeline=None, error=None)
         return 2
 
-    result = run_weld_workcell_pipeline(
-        clean_root=args.clean_root,
-        output_dir=args.output_root / "package",
-        copy_images=not args.no_copy_images,
-        training_split=args.training_split,
-        output_rrd=args.output_rrd,
-    )
+    try:
+        result = run_weld_workcell_pipeline(
+            clean_root=args.clean_root,
+            output_dir=args.output_root / "package",
+            copy_images=not args.no_copy_images,
+            training_split=args.training_split,
+            output_rrd=args.output_rrd,
+        )
+    except Exception as exc:
+        _print_payload(report=report.to_dict(), pipeline=None, error=str(exc))
+        return 1
+
+    _print_payload(report=report.to_dict(), pipeline=result.to_dict(), error=None)
+    return 0
+
+
+def _print_payload(
+    *,
+    report: dict[str, object],
+    pipeline: dict[str, object] | None,
+    error: str | None,
+) -> None:
     print(
         json.dumps(
             {
-                "readiness": report.to_dict(),
-                "pipeline": result.to_dict(),
-                "next_steps": _next_steps(report.overall_status),
+                "readiness": report,
+                "pipeline": pipeline,
+                "output_index": _output_index(pipeline),
+                "next_steps": _next_steps(str(report["overall_status"]), error=error),
+                "error": error,
             },
             indent=2,
         )
     )
-    return 0
 
 
-def _next_steps(overall_status: str) -> list[str]:
+def _output_index(pipeline: dict[str, object] | None) -> dict[str, object] | None:
+    if pipeline is None:
+        return None
+    return {
+        "package_root": pipeline["package_root"],
+        "candidates_csv": pipeline["candidates_csv"],
+        "training_draft_dir": pipeline["training_draft_dir"],
+        "rrd_path": pipeline["rrd_path"],
+    }
+
+
+def _next_steps(overall_status: str, *, error: str | None = None) -> list[str]:
+    if error is not None:
+        return [
+            "Fix the pipeline error, then re-run this onboarding command.",
+            "Keep the readiness report with the failure record for review.",
+        ]
     if overall_status == "blocked":
         return [
             "Fix blocked Clean Zone checks before running the package pipeline.",

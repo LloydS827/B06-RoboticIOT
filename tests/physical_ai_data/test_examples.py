@@ -206,6 +206,10 @@ def test_sdk_real_data_onboarding_example_runs_stage8_candidate(tmp_path: Path):
     assert Path(payload["pipeline"]["candidates_csv"]).is_file()
     assert Path(payload["pipeline"]["training_draft_dir"]).is_dir()
     assert Path(payload["pipeline"]["rrd_path"]).is_file()
+    assert payload["output_index"]["package_root"] == payload["pipeline"]["package_root"]
+    assert Path(payload["output_index"]["candidates_csv"]).is_file()
+    assert Path(payload["output_index"]["training_draft_dir"]).is_dir()
+    assert Path(payload["output_index"]["rrd_path"]).is_file()
     assert payload["next_steps"]
 
 
@@ -240,4 +244,38 @@ def test_sdk_real_data_onboarding_example_blocks_invalid_clean_zone(tmp_path: Pa
     payload = json.loads(result.stdout)
     assert payload["readiness"]["overall_status"] == "blocked"
     assert payload["pipeline"] is None
+    assert payload["output_index"] is None
     assert not (output_root / "package").exists()
+
+
+def test_sdk_real_data_onboarding_example_reports_pipeline_failure_as_json(tmp_path: Path):
+    fixture = generate_stage8_h300_synthetic_demo(tmp_path / "fixture", frame_count=5)
+    output_root = tmp_path / "onboarding"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "examples/sdk_real_data_onboarding.py",
+            "--clean-root",
+            str(fixture.clean_root),
+            "--raw-root",
+            str(fixture.raw_root),
+            "--output-root",
+            str(output_root),
+            "--training-split",
+            "invalid-split",
+        ],
+        cwd=ROOT,
+        env=_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    payload = json.loads(result.stdout)
+    assert payload["readiness"]["overall_status"] == "review_required"
+    assert payload["pipeline"] is None
+    assert payload["output_index"] is None
+    assert "invalid-split" in payload["error"]
+    assert "Traceback" not in result.stderr
