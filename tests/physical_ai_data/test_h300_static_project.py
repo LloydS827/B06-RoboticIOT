@@ -178,6 +178,27 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
     assert ".json" in serialized
 
 
+def test_inspect_h300_static_project_handles_corrupt_image_and_adversarial_keys(tmp_path: Path):
+    project = create_h300_static_project_fixture(tmp_path / "project")
+    project_json_path = project / "campcd_json" / "project_20260101_010101.json"
+    project_payload = json.loads(project_json_path.read_text(encoding="utf-8"))
+    project_payload["client_alpha_secret"] = "present"
+    project_payload["operator_Operator_Wang"] = "present"
+    _write_json(project_json_path, project_payload)
+    corrupt_image_name = "client_alpha_secret_broken.jpg"
+    (project / "project_20260101_010101_image" / corrupt_image_name).write_bytes(b"not an image")
+
+    payload = inspect_h300_static_project(project).to_dict()
+
+    assert payload["summary"]["image_count"] == 1
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "client_alpha_secret" not in serialized
+    assert "client_alpha" not in serialized
+    assert "operator_Operator_Wang" not in serialized
+    assert "Operator_Wang" not in serialized
+    assert corrupt_image_name not in serialized
+
+
 def test_inspect_h300_static_project_summarizes_media_and_programs(tmp_path: Path):
     project = create_h300_static_project_fixture(tmp_path / "project")
 

@@ -14,6 +14,26 @@ _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
 _COMMAND_NAMES = ("MoveAbsJ", "MoveL", "ArcMPL", "Stop")
 _DEFINITION_NAMES = ("ROBTARGET", "JOINTTARGET", "SEAMDATA", "WELDDATA", "WEAVEDATA", "MULTIPASSDATA")
 _GAP_IDS = ("G-001", "G-003", "G-004", "G-005", "G-006", "G-007", "G-008", "G-010", "G-012")
+_PROJECT_TOP_LEVEL_KEY_ALLOWLIST = (
+    "calibration",
+    "camera",
+    "extractPathPlan",
+    "info",
+    "pathPlan",
+    "photoPoses",
+    "processes",
+    "robot",
+    "runtime",
+)
+_SAFE_FIELD_LABELS = {
+    "dataroot": "data_root",
+    "device_id": "device_id",
+    "deviceid": "device_id",
+    "path": "path",
+    "port": "port",
+    "program": "program",
+    "server": "server",
+}
 _PERSON_FIELD_RE = re.compile(r"(operator|author|reviewer|person|user)", re.IGNORECASE)
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _WINDOWS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/]")
@@ -260,7 +280,23 @@ def inspect_h300_static_project(project: str | Path) -> H300StaticProjectReport:
         project_info.update(_summarize_campcd(campcd_json[1]))
 
     files = [_summarize_file(path, project_root) for path in all_files]
-    images = [_summarize_image(path, project_root) for path in all_files if path.suffix.lower() in _IMAGE_SUFFIXES]
+    images: list[H300ImageSummary] = []
+    for path in all_files:
+        if path.suffix.lower() not in _IMAGE_SUFFIXES:
+            continue
+        image_summary = _summarize_image(path, project_root)
+        if image_summary is None:
+            findings.append(
+                _finding(
+                    "parse_error",
+                    _redact_path_pattern(path, project_root),
+                    None,
+                    "review",
+                    "Image file could not be parsed; summary skipped.",
+                )
+            )
+        else:
+            images.append(image_summary)
     point_clouds = [_summarize_pcd(path, project_root) for path in all_files if path.suffix.lower() == ".pcd"]
     text_point_clouds = [
         _summarize_text_point_cloud(path, project_root)
@@ -320,7 +356,8 @@ def _summarize_project(payload: dict[str, Any]) -> dict[str, Any]:
         "has_project_name": bool(info.get("projectName")),
         "is_template": info.get("isTemplate") if isinstance(info.get("isTemplate"), bool) else None,
         "workpiece_seam_type": _safe_label(info.get("workpieceSeamType")),
-        "top_level_keys": sorted(str(key) for key in payload),
+        "known_top_level_keys": [key for key in _PROJECT_TOP_LEVEL_KEY_ALLOWLIST if key in payload],
+        "top_level_key_count": len(payload),
         "photo_pose_count": _count_list(payload.get("photoPoses")),
         "path_plan_count": _count_list(payload.get("pathPlan")),
         "extract_path_plan_count": _count_list(payload.get("extractPathPlan")),
@@ -336,10 +373,13 @@ def _summarize_campcd(payload: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _summarize_image(path: Path, project_root: Path) -> H300ImageSummary:
-    with Image.open(path) as image:
-        width, height = image.size
-        mode = image.mode
+def _summarize_image(path: Path, project_root: Path) -> H300ImageSummary | None:
+    try:
+        with Image.open(path) as image:
+            width, height = image.size
+            mode = image.mode
+    except (OSError, ValueError):
+        return None
     return H300ImageSummary(_redact_path_pattern(path, project_root), width, height, mode)
 
 
@@ -654,4 +694,12 @@ def _finding(
     severity: str,
     message: str,
 ) -> H300SensitivityFinding:
-    return H300SensitivityFinding(finding_type, path_pattern, field, severity, message)
+    return H300SensitivityFinding(finding_type, path_pattern, _normalize_finding_field(field), severity, message)
+
+
+def _normalize_finding_field(field: str | None) -> str | None:
+    if field is None:
+        return None
+    if _PERSON_FIELD_RE.search(field):
+        return "person_field"
+    return _SAFE_FIELD_LABELS.get(field.lower(), "<redacted_field>")
