@@ -199,6 +199,48 @@ def test_inspect_h300_static_project_handles_corrupt_image_and_adversarial_keys(
     assert corrupt_image_name not in serialized
 
 
+def test_inspect_h300_static_project_redacts_adversarial_label_values(tmp_path: Path):
+    project = create_h300_static_project_fixture(tmp_path / "project")
+
+    project_json_path = project / "campcd_json" / "project_20260101_010101.json"
+    project_payload = json.loads(project_json_path.read_text(encoding="utf-8"))
+    project_payload["info"]["workpieceSeamType"] = "client_alpha_secret"
+    _write_json(project_json_path, project_payload)
+
+    recipe_path = project / "weld_seam" / "recipe2_project_20260101_010101.json"
+    recipe_payload = json.loads(recipe_path.read_text(encoding="utf-8"))
+    recipe_payload["weld_seams"][0]["type"] = "client_alpha_secret"
+    recipe_payload["weld_seams"][0]["orientation"] = "operator_Operator_Wang"
+    recipe_payload["weld_seams"][0]["weld_type"] = "client_alpha_secret"
+    recipe_payload["weld_seams"][1]["type"] = "Fillet"
+    recipe_payload["weld_seams"][1]["orientation"] = "vertical"
+    _write_json(recipe_path, recipe_payload)
+
+    flow_path = project / "20260101_010101_weld_config" / "22222_flow.json"
+    flow_payload = json.loads(flow_path.read_text(encoding="utf-8"))
+    flow_payload["flow"].append({"type": "operator_Operator_Wang"})
+    _write_json(flow_path, flow_payload)
+
+    pcd_path = project / "project_20260101_010101_point_cloud" / "project_20260101_010101_part_0.pcd"
+    pcd_text = pcd_path.read_text(encoding="utf-8")
+    pcd_text = pcd_text.replace("FIELDS x y z", "FIELDS x y z client_alpha_secret")
+    pcd_path.write_text(pcd_text, encoding="utf-8")
+
+    payload = inspect_h300_static_project(project).to_dict()
+
+    assert payload["project_info"]["workpiece_seam_type"] == "<redacted>"
+    assert payload["point_clouds"][0]["fields"] == ["x", "y", "z", "<redacted>"]
+    assert payload["weld_seams"]["type_distribution"] == {"<redacted>": 1, "fillet": 1}
+    assert payload["weld_seams"]["orientation_distribution"] == {"<redacted>": 1, "vertical": 1}
+    assert payload["weld_seams"]["weld_type_distribution"] == {"<redacted>": 1, "arc": 1}
+    assert payload["flow_config"]["step_types"] == ["load_project", "run_lua", "<redacted>"]
+
+    serialized = json.dumps(payload, sort_keys=True)
+    assert "client_alpha_secret" not in serialized
+    assert "operator_Operator_Wang" not in serialized
+    assert "Operator_Wang" not in serialized
+
+
 def test_inspect_h300_static_project_summarizes_media_and_programs(tmp_path: Path):
     project = create_h300_static_project_fixture(tmp_path / "project")
 

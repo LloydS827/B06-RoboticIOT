@@ -34,6 +34,40 @@ _SAFE_FIELD_LABELS = {
     "program": "program",
     "server": "server",
 }
+_SAFE_LABELS = {
+    "arc": "arc",
+    "ascii": "ascii",
+    "binary": "binary",
+    "binary_compressed": "binary_compressed",
+    "butt": "butt",
+    "fillet": "fillet",
+    "horizontal": "horizontal",
+    "left": "left",
+    "line": "line",
+    "load_project": "load_project",
+    "plate": "plate",
+    "right": "right",
+    "run_lua": "run_lua",
+    "vertical": "vertical",
+}
+_SAFE_PCD_FIELD_LABELS = {
+    "b": "b",
+    "curvature": "curvature",
+    "g": "g",
+    "intensity": "intensity",
+    "label": "label",
+    "normal_x": "normal_x",
+    "normal_y": "normal_y",
+    "normal_z": "normal_z",
+    "r": "r",
+    "rgb": "rgb",
+    "rgba": "rgba",
+    "ring": "ring",
+    "timestamp": "timestamp",
+    "x": "x",
+    "y": "y",
+    "z": "z",
+}
 _PERSON_FIELD_RE = re.compile(r"(operator|author|reviewer|person|user)", re.IGNORECASE)
 _IP_RE = re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b")
 _WINDOWS_PATH_RE = re.compile(r"\b[A-Za-z]:[\\/]")
@@ -396,11 +430,11 @@ def _summarize_pcd(path: Path, project_root: Path) -> H300PointCloudSummary:
                 break
     return H300PointCloudSummary(
         path_pattern=_redact_path_pattern(path, project_root),
-        fields=header.get("FIELDS", "").split(),
+        fields=[_safe_pcd_field(field) for field in header.get("FIELDS", "").split()],
         width=_int_or_none(header.get("WIDTH")),
         height=_int_or_none(header.get("HEIGHT")),
         points=_int_or_none(header.get("POINTS")),
-        data=header.get("DATA") or None,
+        data=_safe_label(header.get("DATA")),
     )
 
 
@@ -638,7 +672,13 @@ def _safe_label(value: Any) -> str | None:
         return None
     if _contains_sensitive_value(value):
         return "<redacted>"
-    return value
+    return _SAFE_LABELS.get(value.strip().lower(), "<redacted>")
+
+
+def _safe_pcd_field(value: str) -> str:
+    if _contains_sensitive_value(value):
+        return "<redacted>"
+    return _SAFE_PCD_FIELD_LABELS.get(value.strip().lower(), "<redacted>")
 
 
 def _count_safe_value(counter: Counter[str], value: Any) -> None:
