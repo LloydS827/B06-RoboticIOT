@@ -333,8 +333,8 @@
   - 当前可用数据是静态工程包，不是实时作业窗口 API payload。
   - 静态工程包包含视觉建模、点云、焊缝 recipe、路径规划、工艺配置和执行程序等可复用工程资产，足以先做结构 discovery。
   - 在字段、坐标系、目录结构和敏感信息边界未澄清前，不适合提前建设 production connector、DB/schema、realtime API 接入或 Clean Zone 自动转换。
-- 用户决策：采用方案 B，SDK inspection only。Stage 12A 只设计/实现可复用结构化 inspection 和 CLI JSON 入口，不把 Markdown 报告格式转换做成 SDK 产品能力，也不做 SDK 报告格式转换。
-- Raw data local-only：本地真实/脱敏 H300 工程包统一放在 `data/H300/<local-project-run>` 这类受控目录，仓库只提交脱敏结构摘要；`.gitignore` 需要覆盖 `data/`，避免图片、点云、Lua、工程 JSON、内部路径或人员字段误提交。
+- 用户决策：采用方案 B，SDK inspection only。Stage 12A 计划设计/实现可复用结构化 inspection 和 CLI JSON 入口，不把 Markdown 报告格式转换做成 SDK 产品能力，也不做 SDK 报告格式转换。
+- Raw data local-only：本地真实/脱敏 H300 工程包统一放在 `data/H300/<local-project-run>` 这类受控目录，仓库只提交脱敏结构摘要；`.gitignore` 需要覆盖根目录 `/data/`，避免图片、点云、Lua、工程 JSON、内部路径或人员字段误提交。
 - Stage 12A 文档交付物：
   - `docs/stage12a/README.md`：说明目的、边界、计划 CLI `physical-ai-package inspect-h300-static path/to/project --json`、输出解释、redaction policy、Stage 12B/13 关系和非目标。
   - `docs/stage12a/h300_static_project_structure_summary.md`：记录只含占位符和结构事实的脱敏摘要，不包含真实 URL/IP/port、真实工程 basename、真实 operator/author 值或真实时间戳。

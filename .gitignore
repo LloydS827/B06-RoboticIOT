@@ -26,8 +26,7 @@ build/
 .worktrees/
 
 # Local real/de-identified data samples
-data
-data/
+/data/
 
 # Stage 2 generated artifacts
 artifacts/
