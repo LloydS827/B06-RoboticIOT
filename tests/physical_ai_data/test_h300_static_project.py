@@ -315,5 +315,10 @@ def test_inspect_h300_static_project_summarizes_weld_seams_and_gaps(tmp_path: Pa
 
 
 def test_inspect_h300_static_project_rejects_missing_directory(tmp_path: Path):
-    with pytest.raises(FileNotFoundError):
-        inspect_h300_static_project(tmp_path / "missing")
+    missing = tmp_path / "missing"
+
+    with pytest.raises(FileNotFoundError) as exc_info:
+        inspect_h300_static_project(missing)
+
+    assert str(exc_info.value) == "H300 static project directory not found."
+    assert str(missing) not in str(exc_info.value)

@@ -280,7 +280,7 @@ class H300StaticProjectReport:
 def inspect_h300_static_project(project: str | Path) -> H300StaticProjectReport:
     project_root = Path(project)
     if not project_root.is_dir():
-        raise FileNotFoundError(f"H300 static project directory not found: {project_root}")
+        raise FileNotFoundError("H300 static project directory not found.")
 
     all_files = sorted(path for path in project_root.rglob("*") if path.is_file())
     json_payloads: list[tuple[Path, dict[str, Any]]] = []

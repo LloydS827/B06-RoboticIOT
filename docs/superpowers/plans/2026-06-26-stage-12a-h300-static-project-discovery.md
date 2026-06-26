@@ -49,9 +49,9 @@
 Add or update tests only if the repo already has docs tests for `.gitignore`; otherwise use shell verification in this task. Required checks:
 
 ```bash
-git check-ignore -q data
+git check-ignore -q data/example.txt
 rg -q "Stage 12A|static engineering project|静态工程包|inspect-h300-static" README.md details.md docs/stage12a
-rg -n "124\\.71|18801|20260625_124428|project_20260625|recipe2_project|Operator_Wang|192\\.168" README.md details.md docs/stage12a docs/superpowers/specs/2026-06-26-stage-12a-h300-static-project-discovery-design.md
+rg -n "<real-server-token>|<real-port-token>|<real-run-basename>|<real-project-basename>|<real-recipe-basename>|<real-operator-token>|<real-ip-token>" README.md details.md docs/stage12a docs/superpowers/specs/2026-06-26-stage-12a-h300-static-project-discovery-design.md
 ```
 
 Expected before implementation: first command fails because `data/` is not ignored; positive docs scan fails because docs do not exist; negative scan should already have no matches after spec redaction.
@@ -121,9 +121,9 @@ Create `docs/stage12a/h300_static_project_structure_summary.md` using only redac
 Run:
 
 ```bash
-git check-ignore -q data
+git check-ignore -q data/example.txt
 rg -q "Stage 12A|static engineering project|静态工程包|inspect-h300-static" README.md details.md docs/stage12a
-rg -n "124\\.71|18801|20260625_124428|project_20260625|recipe2_project|Operator_Wang|192\\.168" README.md details.md docs/stage12a docs/superpowers/specs/2026-06-26-stage-12a-h300-static-project-discovery-design.md
+rg -n "<real-server-token>|<real-port-token>|<real-run-basename>|<real-project-basename>|<real-recipe-basename>|<real-operator-token>|<real-ip-token>" README.md details.md docs/stage12a docs/superpowers/specs/2026-06-26-stage-12a-h300-static-project-discovery-design.md
 ```
 
 Expected: first two exit 0; negative scan exits 1 with no matches.
@@ -149,20 +149,20 @@ It must write:
 
 ```text
 project/
-  campcd_json/project_20260101_010101.json
-  campcd_json/project_20260101_010101_campcd.json
-  project_20260101_010101_image/project_20260101_010101_part_0.jpg
-  project_20260101_010101_point_cloud/project_20260101_010101_part_0.pcd
-  point_cloud/project_20260101_010101.txt
-  weld_seam/recipe2_project_20260101_010101.json
-  20260101_010101_weld_config/22222_flow.json
-  20260101_010101_lua_script/22222.lua
+  campcd_json/<timestamped-project>.json
+  campcd_json/<timestamped-project>_campcd.json
+  <timestamped-project>_image/<timestamped-project>_part_0.jpg
+  <timestamped-project>_point_cloud/<timestamped-project>_part_0.pcd
+  point_cloud/<timestamped-project>.txt
+  weld_seam/<recipe-json>.json
+  <timestamped-run>_weld_config/<program-id>_flow.json
+  <timestamped-run>_lua_script/<program-id>.lua
 ```
 
 Use a tiny generated JPEG via Pillow. Include intentionally sensitive values in source files:
 
-- `author: "Operator_Wang"`
-- Windows path `C:/SmartWeldData/...`
+- an operator-like author value.
+- a Windows-style internal path.
 - IP-like text in flow or runtime.
 - timestamped basenames.
 
@@ -185,15 +185,15 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
     assert payload["summary"]["lua_arc_mpl_count"] == 1
     assert payload["project_info"]["has_project_name"] is True
     serialized = json.dumps(payload)
-    assert "Operator_Wang" not in serialized
-    assert "20260101" not in serialized
-    assert "010101" not in serialized
-    assert "22222" not in serialized
-    assert "project_20260101_010101" not in serialized
+    assert "<operator-token>" not in serialized
+    assert "<date-token>" not in serialized
+    assert "<time-token>" not in serialized
+    assert "<program-id>" not in serialized
+    assert "<timestamped-project>" not in serialized
     assert str(project) not in serialized
     assert str(tmp_path) not in serialized
-    assert "C:/SmartWeldData" not in serialized
-    assert "192.168" not in serialized
+    assert "<internal-windows-path>" not in serialized
+    assert "<ip-token>" not in serialized
 ```
 
 Expected before implementation: import/function missing.
@@ -338,15 +338,15 @@ def test_cli_inspect_h300_static_json(tmp_path):
     payload = json.loads(result.stdout)
     assert payload["recognized"] is True
     assert payload["summary"]["weld_seam_count"] == 2
-    assert "Operator_Wang" not in result.stdout
-    assert "20260101" not in result.stdout
-    assert "010101" not in result.stdout
-    assert "22222" not in result.stdout
-    assert "project_20260101_010101" not in result.stdout
+    assert "<operator-token>" not in result.stdout
+    assert "<date-token>" not in result.stdout
+    assert "<time-token>" not in result.stdout
+    assert "<program-id>" not in result.stdout
+    assert "<timestamped-project>" not in result.stdout
     assert str(project) not in result.stdout
     assert str(tmp_path) not in result.stdout
-    assert "C:/SmartWeldData" not in result.stdout
-    assert "192.168" not in result.stdout
+    assert "<internal-windows-path>" not in result.stdout
+    assert "<ip-token>" not in result.stdout
 ```
 
 Add missing directory test:
@@ -473,10 +473,10 @@ python -m pytest tests/physical_ai_data/test_examples.py tests/physical_ai_data/
 
 - [ ] **Step 6: Real local sample smoke**
 
-From the root worktree, if local real data is accessible at the main workspace but not this worktree, run the CLI against the main path explicitly:
+From an environment where local real data is accessible, run the CLI against the local-only project path without recording the path in committed docs:
 
 ```bash
-python scripts/physical_ai_package.py inspect-h300-static "/Users/lloyd/Nutstore Files/Nutstore/CavLAB/P00-Projects/分类0-核心研发/B06-Robotic IOT 与物理数据层/data/H300/<local-project-run>" --json
+python scripts/physical_ai_package.py inspect-h300-static "data/H300/<local-project-run>" --json
 ```
 
 Do not commit stdout. Record only redacted facts in `details.md`, such as recognized true, image count, PCD count, seam count, Lua command counts, sensitivity finding categories.
@@ -567,7 +567,7 @@ rg -q "Stage 12A|static engineering project|静态工程包|inspect-h300-static|
 Negative scan:
 
 ```bash
-rg -n "124\\.71|18801|20260625_124428|project_20260625|recipe2_project|Operator_Wang|192\\.168|C:/SmartWeldData" README.md details.md docs/stage12a docs/sdk docs/superpowers/specs
+rg -n "<real-server-token>|<real-port-token>|<real-run-basename>|<real-project-basename>|<real-recipe-basename>|<real-operator-token>|<real-ip-token>|<real-internal-path-token>" README.md details.md docs/stage12a docs/sdk docs/superpowers/specs
 ```
 
 Expected: positive scan exit 0; negative scan exit 1 with no matches.
