@@ -31,7 +31,7 @@
 
 - `to_dict()` and CLI JSON must be safe to save as review attachments.
 - Do not output absolute paths.
-- Do not output raw local root names, raw project basenames, exact embedded timestamps, IPs, server/port values, operator/author/reviewer values, raw Lua code, raw JSON payloads, raw point coordinates, image content, or binary PCD content.
+- Do not output raw local root names, raw project basenames, basename fragments, exact embedded timestamps, short program IDs such as `22222`, IPs, server/port values, operator/author/reviewer values, raw Lua code, raw JSON payloads, raw point coordinates, image content, or binary PCD content.
 - Output path patterns such as `campcd_json/project_<redacted>.json`, roles, extensions, counts, sizes, image dimensions, point cloud header metadata, command counts, and risk finding categories.
 - Sensitivity findings may include `finding_type`, `path_pattern`, `field`, `severity`, and `message`, but not the sensitive value itself.
 
@@ -184,9 +184,16 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
     assert payload["summary"]["path_plan_count"] == 2
     assert payload["summary"]["lua_arc_mpl_count"] == 1
     assert payload["project_info"]["has_project_name"] is True
-    assert "Operator_Wang" not in json.dumps(payload)
-    assert "20260101" not in json.dumps(payload)
-    assert "C:/SmartWeldData" not in json.dumps(payload)
+    serialized = json.dumps(payload)
+    assert "Operator_Wang" not in serialized
+    assert "20260101" not in serialized
+    assert "010101" not in serialized
+    assert "22222" not in serialized
+    assert "project_20260101_010101" not in serialized
+    assert str(project) not in serialized
+    assert str(tmp_path) not in serialized
+    assert "C:/SmartWeldData" not in serialized
+    assert "192.168" not in serialized
 ```
 
 Expected before implementation: import/function missing.
@@ -200,7 +207,7 @@ Cover:
 - text point cloud column count sampled without raw coordinates in payload.
 - Lua command counts.
 - weld seam type/orientation distributions.
-- gap mapping includes at least G-003, G-004, G-007, G-008, G-012.
+- gap mapping includes the complete spec set: G-001, G-003, G-004, G-005, G-006, G-007, G-008, G-010, G-012.
 
 - [ ] **Step 4: Write failing invalid input test**
 
@@ -258,10 +265,12 @@ Implement:
 
 Rules:
 
-- Replace 8+ digit runs with `<timestamp>`.
+- Replace 6+ digit runs with `<timestamp>` and redact known program/config IDs used in basenames, including short numeric names such as `22222`.
 - Replace `project_<...>` middle portions with `project_<redacted>`.
 - Do not emit Windows absolute path values.
+- Do not emit POSIX absolute paths, `tmp_path`, or raw project root names.
 - Do not emit author/operator/reviewer values.
+- Do not emit IP addresses, server ports, or raw program/config IDs.
 
 - [ ] **Step 8: Implement parsers**
 
@@ -331,6 +340,13 @@ def test_cli_inspect_h300_static_json(tmp_path):
     assert payload["summary"]["weld_seam_count"] == 2
     assert "Operator_Wang" not in result.stdout
     assert "20260101" not in result.stdout
+    assert "010101" not in result.stdout
+    assert "22222" not in result.stdout
+    assert "project_20260101_010101" not in result.stdout
+    assert str(project) not in result.stdout
+    assert str(tmp_path) not in result.stdout
+    assert "C:/SmartWeldData" not in result.stdout
+    assert "192.168" not in result.stdout
 ```
 
 Add missing directory test:
@@ -340,6 +356,7 @@ def test_cli_inspect_h300_static_missing_directory_returns_error(tmp_path):
     result = _run(["inspect-h300-static", str(tmp_path / "missing"), "--json"])
     assert result.returncode == 1
     assert "Error:" in result.stderr
+    assert str(tmp_path) not in result.stdout
 ```
 
 - [ ] **Step 3: Run focused tests and confirm failure**
@@ -459,7 +476,7 @@ python -m pytest tests/physical_ai_data/test_examples.py tests/physical_ai_data/
 From the root worktree, if local real data is accessible at the main workspace but not this worktree, run the CLI against the main path explicitly:
 
 ```bash
-physical-ai-package inspect-h300-static "/Users/lloyd/Nutstore Files/Nutstore/CavLAB/P00-Projects/分类0-核心研发/B06-Robotic IOT 与物理数据层/data/H300/<local-project-run>" --json
+python scripts/physical_ai_package.py inspect-h300-static "/Users/lloyd/Nutstore Files/Nutstore/CavLAB/P00-Projects/分类0-核心研发/B06-Robotic IOT 与物理数据层/data/H300/<local-project-run>" --json
 ```
 
 Do not commit stdout. Record only redacted facts in `details.md`, such as recognized true, image count, PCD count, seam count, Lua command counts, sensitivity finding categories.
@@ -513,7 +530,7 @@ Record exact pass count and time.
 - [ ] **Step 3: Run doctor smoke**
 
 ```bash
-physical-ai-package doctor --json
+python scripts/physical_ai_package.py doctor --json
 ```
 
 Expected: exit 0 and `ok: true` in this worktree.
@@ -523,7 +540,7 @@ Expected: exit 0 and `ok: true` in this worktree.
 Use a temporary synthetic fixture generated by tests or example helper, then:
 
 ```bash
-physical-ai-package inspect-h300-static <tmp-synthetic-project> --json
+python scripts/physical_ai_package.py inspect-h300-static <tmp-synthetic-project> --json
 ```
 
 Expected: exit 0, `recognized: true`, redacted output.
@@ -535,7 +552,7 @@ If local `data/H300/<local-project-run>` is available, run CLI against it. Expec
 - exit 0
 - `recognized: true`
 - counts match redacted summary
-- output contains no known sensitive values
+- output contains no known sensitive values, raw basenames, absolute paths, short program IDs, IPs, ports, or operator/author values
 
 If not available inside the worktree, use the main workspace absolute path and do not commit any output.
 
