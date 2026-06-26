@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from physical_ai_data.schema import ValidationMessage, ValidationResult
+from tests.physical_ai_data.test_h300_static_project import create_h300_static_project_fixture
 
 
 SCRIPT = Path("scripts/physical_ai_package.py")
@@ -404,6 +405,35 @@ def test_cli_assess_h300_readiness_text_output_lists_gap_next_steps(tmp_path: Pa
     assert "H300 readiness: review_required" in result.stdout
     assert "gap G-003" in result.stdout
     assert "next step:" in result.stdout
+
+
+def test_cli_inspect_h300_static_json(tmp_path: Path):
+    project = create_h300_static_project_fixture(tmp_path / "project")
+
+    result = _run(["inspect-h300-static", str(project), "--json"])
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recognized"] is True
+    assert payload["summary"]["weld_seam_count"] == 2
+    assert "Operator_Wang" not in result.stdout
+    assert "20260101" not in result.stdout
+    assert "010101" not in result.stdout
+    assert "22222" not in result.stdout
+    assert "project_20260101_010101" not in result.stdout
+    assert str(project) not in result.stdout
+    assert str(tmp_path) not in result.stdout
+    assert "C:/SmartWeldData" not in result.stdout
+    assert "192.168" not in result.stdout
+
+
+def test_cli_inspect_h300_static_missing_directory_returns_error(tmp_path: Path):
+    result = _run(["inspect-h300-static", str(tmp_path / "missing"), "--json"])
+
+    assert result.returncode == 1
+    assert result.stderr == "Error: H300 static project directory not found.\n"
+    assert str(tmp_path) not in result.stdout
+    assert str(tmp_path) not in result.stderr
 
 
 def test_cli_doctor_json_reports_environment():

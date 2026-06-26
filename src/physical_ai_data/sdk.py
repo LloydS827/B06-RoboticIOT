@@ -4,7 +4,7 @@ from pathlib import Path
 
 from physical_ai_data.candidates import export_candidates, summarize_package
 from physical_ai_data.environment import SdkEnvironmentReport, inspect_sdk_environment
-from physical_ai_data.rerun_adapter import write_rrd
+from physical_ai_data.h300_static_project import H300StaticProjectReport, inspect_h300_static_project
 from physical_ai_data.schema import ValidationResult
 from physical_ai_data.stage11_readiness import (
     GapStatus,
@@ -22,9 +22,11 @@ __all__ = [
     "convert_to_rerun",
     "export_training_eval_draft",
     "GapStatus",
+    "H300StaticProjectReport",
     "H300ReadinessReport",
     "ReadinessCheck",
     "assess_h300_sample_readiness",
+    "inspect_h300_static_project",
     "SdkEnvironmentReport",
     "inspect_sdk_environment",
 ]
@@ -48,6 +50,8 @@ def export_candidates_csv(
 
 
 def convert_to_rerun(package_root: str | Path, output_rrd: str | Path) -> Path:
+    from physical_ai_data.rerun_adapter import write_rrd
+
     return write_rrd(package_root, output_rrd)
 
 

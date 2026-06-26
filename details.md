@@ -326,11 +326,32 @@
 - Stage 11.1 边界保持不变：不实现 production connector、TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema、demo UI、H300 现场协议、A02 converter 或 Physical AI Package schema changes。
 - 下一步仍是：至少一条脱敏 H300 最小作业窗口样本完成访问边界、提交边界和受控目录确认后，才进入 Stage 12 first de-identified H300 sample replacement pilot。
 
+### 2026-06-26
+
+- 确认 Stage 12A 路线修正为 **H300 static engineering project discovery**：H300 真机静态工程包已经在本地受控目录到位，实时 API 仍需后续开发；因此本阶段不再等待首条脱敏最小作业窗口过程采样，而是先学习静态工程包结构、脱敏边界和 Clean Zone mapping 输入。
+- 路线变化原因：
+  - 当前可用数据是静态工程包，不是实时作业窗口 API payload。
+  - 静态工程包包含视觉建模、点云、焊缝 recipe、路径规划、工艺配置和执行程序等可复用工程资产，足以先做结构 discovery。
+  - 在字段、坐标系、目录结构和敏感信息边界未澄清前，不适合提前建设 production connector、DB/schema、realtime API 接入或 Clean Zone 自动转换。
+- 用户决策：采用方案 B，SDK inspection only。Stage 12A 计划设计/实现可复用结构化 inspection 和 CLI JSON 入口，不把 Markdown 报告格式转换做成 SDK 产品能力，也不做 SDK 报告格式转换。
+- Raw data local-only：本地真实/脱敏 H300 工程包统一放在 `data/H300/<local-project-run>` 这类受控目录，仓库只提交脱敏结构摘要；`.gitignore` 需要覆盖根目录 `/data/`，避免图片、点云、Lua、工程 JSON、内部路径或人员字段误提交。
+- Stage 12A 文档交付物：
+  - `docs/stage12a/README.md`：说明目的、边界、CLI/SDK inspection 入口 `physical-ai-package inspect-h300-static path/to/project --json`、输出解释、redaction policy、Stage 12B/13 关系和非目标。
+  - `docs/stage12a/h300_static_project_structure_summary.md`：记录只含占位符和结构事实的脱敏摘要，不包含真实 URL/IP/port、真实工程 basename、真实 operator/author 值或真实时间戳。
+- Stage 12A 非目标保持明确：不做 production connector、TCP/IP server、SDK bridge、OPC UA/MES/HMI/PLC 直连、DB ingestion、长期 DB schema、realtime API、demo UI、Physical AI Package v0.1 schema 修改或 H300 静态工程包到 `weld_workcell` Clean Zone 的自动转换。
+- Stage 12A Task 4 SDK onboarding 补充：
+  - `docs/sdk/README.md` 已把 `inspect_h300_static_project(...)`、`H300StaticProjectReport`、CLI `inspect-h300-static PROJECT_ROOT --json` 到 SDK 的映射和示例入口纳入公共 SDK 文档。
+  - `examples/sdk_h300_static_project_inspect.py` 提供最小 SDK 示例：输入本地静态工程目录，调用顶层 `inspect_h300_static_project(...)`，输出 `report.to_dict()` JSON；示例面向 synthetic fixture 和受控本地样本，不依赖提交仓库的真实 `data/H300`。
+  - 真实静态样本 smoke 使用 `data/H300/<local-project-run>` 受控本地目录执行 CLI JSON inspection，结果仅记录脱敏结构事实：`recognized: true`；files 13；images 3；PCD point clouds 3；text point clouds 1；weld seams 11；weld seam segments 76；path plans 11；extract path plans 11；campcd pcd-with-camera entries 3；flow steps 22；Lua command counts `ArcMPL=3`、`MoveAbsJ=2`、`MoveL=2`、`Stop=2`。
+  - 当前 gap ids：`G-001`、`G-003`、`G-004`、`G-005`、`G-006`、`G-007`、`G-008`、`G-010`、`G-012`。这些 gap 用于字段/结构发现和数据要求澄清，不表示 Clean Zone 自动转换已经完成。
+  - 当前路线：静态样本已经到位，可先固化字段清单、目录结构、敏感信息边界和最小可替换路径；实时 API 仍未到位，后续需等待 realtime API 样例再补时间戳、实时状态、事件、报警、过程参数和采样频率要求。
+
 ## 下一步计划
 
-1. 至少一条脱敏 H300 最小作业窗口样本完成访问和提交边界确认后，进入 Stage 12 first de-identified H300 sample replacement pilot，并用 Stage 11 readiness report 驱动 Stage 8 gap register 的关闭、拆分或升级。
-2. SDK examples 被稳定采用且有明确评审展示需求后，再评估轻量 demo UI；该 UI 只作为演示入口，不替代 SDK 主产品边界。
-3. 在样本驱动的 gap 证明必要前，继续避免 production connector、DB/schema、完整 Web 平台或 H300 现场协议建设。
+1. 基于 Stage 12A H300 静态工程包 discovery 的 redacted-safe inspector 和本地 smoke 结论，先固化数据要求、字段清单和最小可替换路径。
+2. Stage 12B 基于 Stage 12A mapping 决定是否形成 H300 static project to Clean Zone draft readiness，或只输出人工 mapping checklist。
+3. Stage 13 等 realtime API 样例可用后，再补时间戳、实时状态、事件、报警、过程参数和采样频率要求。
+4. 在静态工程包与实时 API 共同证明必要前，继续避免 production connector、DB/schema、完整 Web 平台、demo UI 或 H300 现场协议建设。
 
 ## 维护约定
 

@@ -9,6 +9,7 @@ import physical_ai_data
 import physical_ai_data.sdk as sdk
 from physical_ai_data import (
     GapStatus,
+    H300StaticProjectReport,
     H300ReadinessReport,
     ReadinessCheck,
     SdkEnvironmentReport,
@@ -16,6 +17,7 @@ from physical_ai_data import (
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_h300_static_project,
     inspect_sdk_environment,
     summarize,
     validate,
@@ -31,8 +33,10 @@ def test_top_level_exports_sdk_functions():
     assert callable(convert_to_rerun)
     assert callable(export_training_eval_draft)
     assert callable(assess_h300_sample_readiness)
+    assert callable(inspect_h300_static_project)
     assert callable(inspect_sdk_environment)
     assert isinstance(GapStatus.__name__, str)
+    assert isinstance(H300StaticProjectReport.__name__, str)
     assert isinstance(H300ReadinessReport.__name__, str)
     assert isinstance(ReadinessCheck.__name__, str)
     assert isinstance(SdkEnvironmentReport.__name__, str)
@@ -45,9 +49,11 @@ def test_top_level_exports_sdk_functions():
         "convert_to_rerun",
         "export_training_eval_draft",
         "GapStatus",
+        "H300StaticProjectReport",
         "H300ReadinessReport",
         "ReadinessCheck",
         "assess_h300_sample_readiness",
+        "inspect_h300_static_project",
         "SdkEnvironmentReport",
         "inspect_sdk_environment",
     }
@@ -58,9 +64,11 @@ def test_top_level_exports_sdk_functions():
         "convert_to_rerun",
         "export_training_eval_draft",
         "GapStatus",
+        "H300StaticProjectReport",
         "H300ReadinessReport",
         "ReadinessCheck",
         "assess_h300_sample_readiness",
+        "inspect_h300_static_project",
         "SdkEnvironmentReport",
         "inspect_sdk_environment",
     }
@@ -78,6 +86,7 @@ forbidden_modules = {
     "physical_ai_data.lerobot_adapter",
     "physical_ai_data.lerobot_loader",
     "physical_ai_data.lerobot_profiles",
+    "physical_ai_data.rerun_adapter",
 }
 forbidden_roots = ("lerobot", "rerun")
 offenders = sorted(
