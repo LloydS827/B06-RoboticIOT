@@ -16,6 +16,7 @@ from physical_ai_data.sdk import (
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_h300_static_project,
     inspect_sdk_environment,
     summarize,
     validate,
@@ -97,6 +98,14 @@ def _build_parser() -> argparse.ArgumentParser:
     readiness.add_argument("--raw-root", type=Path, help="Optional Raw H300 sample root directory.")
     readiness.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
     readiness.set_defaults(func=_assess_h300_readiness)
+
+    inspect_static = subcommands.add_parser(
+        "inspect-h300-static",
+        help="Inspect a local H300 static engineering project.",
+    )
+    inspect_static.add_argument("project_root", type=Path, help="Local H300 static engineering project root.")
+    inspect_static.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
+    inspect_static.set_defaults(func=_inspect_h300_static)
 
     doctor = subcommands.add_parser("doctor", help="Inspect the installed SDK environment.")
     doctor.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
@@ -227,6 +236,17 @@ def _assess_h300_readiness(args: argparse.Namespace) -> int:
     return 0
 
 
+def _inspect_h300_static(args: argparse.Namespace) -> int:
+    report = inspect_h300_static_project(args.project_root)
+    if args.json:
+        _print_json(report.to_dict())
+        return 0
+
+    print(f"H300 static project: recognized={report.recognized}")
+    print(_format_h300_static_summary(report.summary))
+    return 0
+
+
 def _doctor(args: argparse.Namespace) -> int:
     report = inspect_sdk_environment()
     if args.json:
@@ -346,6 +366,21 @@ def _format_summary(summary: dict[str, object]) -> str:
         "event_count",
         "label_count",
         "metric_count",
+    ]
+    return "\n".join(f"{field}: {summary.get(field, '')}" for field in fields)
+
+
+def _format_h300_static_summary(summary: dict[str, object]) -> str:
+    fields = [
+        "file_count",
+        "image_count",
+        "point_cloud_count",
+        "text_point_cloud_count",
+        "weld_seam_count",
+        "path_plan_count",
+        "lua_arc_mpl_count",
+        "flow_step_count",
+        "sensitivity_finding_count",
     ]
     return "\n".join(f"{field}: {summary.get(field, '')}" for field in fields)
 

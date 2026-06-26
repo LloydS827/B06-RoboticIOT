@@ -2,6 +2,7 @@
 
 from physical_ai_data.sdk import (
     GapStatus,
+    H300StaticProjectReport,
     H300ReadinessReport,
     ReadinessCheck,
     SdkEnvironmentReport,
@@ -9,6 +10,7 @@ from physical_ai_data.sdk import (
     convert_to_rerun,
     export_candidates_csv,
     export_training_eval_draft,
+    inspect_h300_static_project,
     inspect_sdk_environment,
     summarize,
     validate,
@@ -24,9 +26,11 @@ __all__ = [
     "convert_to_rerun",
     "export_training_eval_draft",
     "GapStatus",
+    "H300StaticProjectReport",
     "H300ReadinessReport",
     "ReadinessCheck",
     "assess_h300_sample_readiness",
+    "inspect_h300_static_project",
     "SdkEnvironmentReport",
     "inspect_sdk_environment",
 ]
