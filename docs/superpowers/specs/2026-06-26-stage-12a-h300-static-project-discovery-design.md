@@ -8,17 +8,17 @@ Stage 11.1 已把 B06 收敛为 SDK-first 的 candidate real/de-identified onboa
 
 ## 当前样本观察
 
-用户在本地受控目录 `data/H300/20260625_124428` 放入了一个 H300 工程包。该目录不应提交仓库，只用于本地结构分析和 smoke。已观察到的脱敏结构摘要如下：
+用户在本地受控目录 `data/H300/<local-project-run>` 放入了一个 H300 工程包。该目录不应提交仓库，只用于本地结构分析和 smoke。已观察到的脱敏结构摘要如下：
 
-- 工程主 JSON：`campcd_json/project_20260625_101838.json`，包含 `info`、`calibration`、`camera`、`photoPoses`、`pathPlan`、`extractPathPlan`、`processes`、`robot`、`runtime` 等对象。
-- 相机/点云索引：`campcd_json/project_20260625_101838_campcd.json`，包含 3 组 `pcdWithCam` 图像、点云和相机位姿引用，以及 ROI。
+- 工程主 JSON：`campcd_json/project_<redacted>.json`，包含 `info`、`calibration`、`camera`、`photoPoses`、`pathPlan`、`extractPathPlan`、`processes`、`robot`、`runtime` 等对象。
+- 相机/点云索引：`campcd_json/project_<redacted>_campcd.json`，包含 3 组 `pcdWithCam` 图像、点云和相机位姿引用，以及 ROI。
 - 图片：3 张 1440x1080 RGB JPEG。
 - 点云：3 个 binary PCD 分片，字段为 `x y z`，合计约 135 万点；另有一个裸 xyz 文本点云文件。
-- 焊缝 recipe：`weld_seam/recipe2_project_20260625_113936319.json`，包含 11 条 `weld_seams`。
+- 焊缝 recipe：`weld_seam/recipe_<redacted>.json`，包含 11 条 `weld_seams`。
 - 规划数据：`pathPlan` 与 `extractPathPlan` 各 11 条。
 - Lua/ABB RAPID 风格程序：包含 `MoveAbsJ`、`MoveL`、`ArcMPL`、`Stop`、`ROBTARGET`、`JOINTTARGET`、`SEAMDATA`、`WELDDATA`、`WEAVEDATA`、`MULTIPASSDATA` 等指令或数据定义；其中 `ArcMPL` 代表实际焊接动作。
 - 焊接 flow config：包含 22 个 flow step。
-- Web 原型：`http://124.71.158.78:18801/` 是 ClientEngine 控制面板，已有实时/离线模式、工程选择、下载工程、运行日志、Lua analysis 和 plan execution 页面。Lua analysis 已能展示执行序列；plan execution 对当前目录结构仍提示缺少 `project_file` 目录。
+- Web 原型：`<clientengine-control-panel-url>` 是 ClientEngine 控制面板，已有实时/离线模式、工程选择、下载工程、运行日志、Lua analysis 和 plan execution 页面。Lua analysis 已能展示执行序列；plan execution 对当前目录结构仍提示缺少 `project_file` 目录。
 
 这些观察说明：H300 静态工程包不是单纯的作业窗口过程采样，而是可复用工程模板资产，连接视觉建模、点云、焊缝提取、路径规划、工艺配置和执行程序。
 
@@ -79,10 +79,11 @@ physical-ai-package inspect-h300-static path/to/h300/project --json
 
 字段：
 
-- `project_root: Path`
+- `project_root: Path`，仅在 Python 对象内保留，不由默认 `to_dict()` 输出绝对路径
+- `project_root_name: str` 或 `root_label: str`，用于 JSON 中的脱敏根标识
 - `recognized: bool`
 - `project_info: dict[str, object]`
-- `files: list[H300StaticFile]`
+- `files: list[H300StaticFile]`，默认仅含 redacted relative path pattern
 - `images: list[H300ImageSummary]`
 - `point_clouds: list[H300PointCloudSummary]`
 - `text_point_clouds: list[H300TextPointCloudSummary]`
@@ -94,14 +95,14 @@ physical-ai-package inspect-h300-static path/to/h300/project --json
 - `gap_mapping: list[H300GapMapping]`
 - `summary: dict[str, object]`
 
-每个对象提供 `to_dict()`，确保 CLI JSON 可直接序列化。
+每个对象提供 `to_dict()`，确保 CLI JSON 可直接序列化。默认 `to_dict()` 必须是 redacted-safe：不输出绝对路径、原始工程名、原始 basename 中的时间戳、IP、server/port、operator/author/reviewer 值或原始代码/点云/图片内容。
 
 ### 文件与媒体摘要
 
-- 文件摘要记录相对路径、扩展名、大小、角色猜测，不记录原始内容。
+- 文件摘要记录脱敏相对路径模式、扩展名、大小、角色猜测，不记录原始内容；默认 JSON 不保留真实 basename。
 - 图片摘要记录路径、宽高、模式，不复制图片。
 - PCD 摘要只解析 header，记录 fields、width、height、points、data encoding，不读取 binary 点体。
-- 裸 xyz 文本点云摘要只读取少量行判断列数和行数；不输出原始点。
+- 裸 xyz 文本点云摘要采样少量行判断列数，并通过可配置上限扫描或估算记录行数口径；不为准确计数而无条件读取超大文件，不输出原始点。
 
 ### 工程语义摘要
 
@@ -111,7 +112,9 @@ physical-ai-package inspect-h300-static path/to/h300/project --json
 - Lua 摘要记录关键指令计数、焊接动作计数、目标点定义计数，不输出原始代码。
 - flow config 记录 step count 与基本类型，不输出原始流程内容。
 
-## 敏感信息检查
+## Redaction 与敏感信息检查
+
+Stage 12A 的 SDK/CLI JSON 可能被保存为评审附件，因此默认输出必须按可提交摘要处理。允许在 Python 对象内部使用 `Path` 做本地计算，但 `to_dict()` 和 CLI JSON 只能输出脱敏路径标签、角色、扩展名、数量和路径模式。真实相对文件名如果包含时间戳、工单、人员、客户或内部命名，也应替换为 `<redacted>` 或 `<timestamp>` 样式。
 
 Stage 12A 的检查应保守，宁可标记 review，也不要把真实字段误判为安全。第一阶段检查：
 
@@ -191,7 +194,7 @@ CLI 的职责是：
 4. 实现 `h300_static_project.py` 与顶层 SDK export。
 5. 实现 CLI `inspect-h300-static --json`。
 6. 补充 SDK docs/examples 索引。
-7. 本地使用真实 `data/H300/20260625_124428` 做 manual smoke，只记录脱敏结果，不提交原始数据。
+7. 本地使用真实 `data/H300/<local-project-run>` 做 manual smoke，只记录脱敏结果，不提交原始数据。
 
 ## 后续阶段
 
