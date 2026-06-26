@@ -544,10 +544,36 @@ def _redact_path_pattern(path: Path, project_root: Path) -> str:
         relative = path.relative_to(project_root)
     except ValueError:
         relative = Path(path.name)
-    return "/".join(_redact_basename(part) for part in relative.parts)
+    return "/".join(
+        _redact_path_part(part, is_file=index == len(relative.parts) - 1)
+        for index, part in enumerate(relative.parts)
+    )
 
 
-def _redact_basename(name: str) -> str:
+def _redact_path_part(name: str, *, is_file: bool) -> str:
+    if is_file:
+        return _redact_file_basename(name)
+    return _redact_directory_basename(name)
+
+
+def _redact_directory_basename(name: str) -> str:
+    path = Path(name)
+    lowered = path.stem.lower()
+    if lowered in {"campcd_json", "point_cloud", "weld_seam"}:
+        return lowered
+    if lowered.startswith("project_"):
+        if lowered.endswith("_image"):
+            return "project_<redacted>_image"
+        if lowered.endswith("_point_cloud"):
+            return "project_<redacted>_point_cloud"
+    if lowered.endswith("_weld_config"):
+        return "weld_config"
+    if lowered.endswith("_lua_script"):
+        return "lua_script"
+    return "<redacted>"
+
+
+def _redact_file_basename(name: str) -> str:
     path = Path(name)
     stem = path.stem
     suffix = path.suffix
@@ -564,8 +590,7 @@ def _redact_basename(name: str) -> str:
         return f"project_<redacted>{suffix}"
     if lowered.startswith("recipe2_project_") or lowered.startswith("recipe_project_"):
         return re.sub(r"project_.+", "project_<redacted>", stem) + suffix
-    redacted = re.sub(r"\d+", "<timestamp>", stem)
-    return redacted + suffix
+    return f"<redacted>{suffix}"
 
 
 def _safe_label(value: Any) -> str | None:

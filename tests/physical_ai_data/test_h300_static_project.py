@@ -18,6 +18,7 @@ def create_h300_static_project_fixture(root: Path) -> Path:
     (root / "weld_seam").mkdir()
     (root / "20260101_010101_weld_config").mkdir()
     (root / "20260101_010101_lua_script").mkdir()
+    (root / "misc").mkdir()
 
     project_payload = {
         "info": {
@@ -132,6 +133,8 @@ def create_h300_static_project_fixture(root: Path) -> Path:
     ! Operator_Wang C:/SmartWeldData 192.168.31.88 22222 project_20260101_010101
     """
     (root / "20260101_010101_lua_script" / "22222.lua").write_text(lua_text, encoding="utf-8")
+    (root / "misc" / "Operator_Wang_notes.txt").write_text("review notes\n", encoding="utf-8")
+    _write_json(root / "misc" / "client_alpha_config.json", {"enabled": True})
 
     return root
 
@@ -158,6 +161,9 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
 
     serialized = json.dumps(payload, sort_keys=True)
     assert "Operator_Wang" not in serialized
+    assert "Operator_Wang_notes" not in serialized
+    assert "client_alpha_config" not in serialized
+    assert "client_alpha" not in serialized
     assert "20260101" not in serialized
     assert "010101" not in serialized
     assert "22222" not in serialized
@@ -168,6 +174,8 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
     assert "192.168" not in serialized
     assert "123.456" not in serialized
     assert "ArcMPL pStart" not in serialized
+    assert ".txt" in serialized
+    assert ".json" in serialized
 
 
 def test_inspect_h300_static_project_summarizes_media_and_programs(tmp_path: Path):
