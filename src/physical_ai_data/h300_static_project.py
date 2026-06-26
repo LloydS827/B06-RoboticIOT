@@ -11,6 +11,7 @@ from PIL import Image
 
 
 _IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png"}
+_SAFE_FILE_SUFFIXES = _IMAGE_SUFFIXES | {".json", ".pcd", ".txt", ".lua", ".md", ".csv"}
 _COMMAND_NAMES = ("MoveAbsJ", "MoveL", "ArcMPL", "Stop")
 _DEFINITION_NAMES = ("ROBTARGET", "JOINTTARGET", "SEAMDATA", "WELDDATA", "WEAVEDATA", "MULTIPASSDATA")
 _GAP_IDS = ("G-001", "G-003", "G-004", "G-005", "G-006", "G-007", "G-008", "G-010", "G-012")
@@ -378,7 +379,7 @@ def inspect_h300_static_project(project: str | Path) -> H300StaticProjectReport:
 def _summarize_file(path: Path, project_root: Path) -> H300StaticFile:
     return H300StaticFile(
         path_pattern=_redact_path_pattern(path, project_root),
-        extension=path.suffix.lower(),
+        extension=_safe_file_suffix(path.suffix),
         size_bytes=path.stat().st_size,
         role=_guess_role(path),
     )
@@ -650,7 +651,7 @@ def _redact_directory_basename(name: str) -> str:
 def _redact_file_basename(name: str) -> str:
     path = Path(name)
     stem = path.stem
-    suffix = path.suffix
+    suffix = _safe_file_suffix(path.suffix)
     lowered = stem.lower()
     if lowered.startswith("project_"):
         if "_part_" in lowered:
@@ -665,6 +666,15 @@ def _redact_file_basename(name: str) -> str:
     if lowered.startswith("recipe2_project_") or lowered.startswith("recipe_project_"):
         return re.sub(r"project_.+", "project_<redacted>", stem) + suffix
     return f"<redacted>{suffix}"
+
+
+def _safe_file_suffix(suffix: str) -> str:
+    if not suffix:
+        return ""
+    lowered = suffix.lower()
+    if lowered in _SAFE_FILE_SUFFIXES:
+        return lowered
+    return "<redacted_extension>"
 
 
 def _safe_label(value: Any) -> str | None:

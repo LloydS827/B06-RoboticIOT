@@ -135,6 +135,7 @@ def create_h300_static_project_fixture(root: Path) -> Path:
     (root / "20260101_010101_lua_script" / "22222.lua").write_text(lua_text, encoding="utf-8")
     (root / "misc" / "Operator_Wang_notes.txt").write_text("review notes\n", encoding="utf-8")
     _write_json(root / "misc" / "client_alpha_config.json", {"enabled": True})
+    (root / "misc" / "notes.client_alpha_secret").write_text("review notes\n", encoding="utf-8")
 
     return root
 
@@ -163,6 +164,8 @@ def test_inspect_h300_static_project_summarizes_fixture_without_raw_values(tmp_p
     assert "Operator_Wang" not in serialized
     assert "Operator_Wang_notes" not in serialized
     assert "client_alpha_config" not in serialized
+    assert "client_alpha_secret" not in serialized
+    assert ".client_alpha_secret" not in serialized
     assert "client_alpha" not in serialized
     assert "20260101" not in serialized
     assert "010101" not in serialized
