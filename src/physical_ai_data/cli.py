@@ -237,7 +237,12 @@ def _assess_h300_readiness(args: argparse.Namespace) -> int:
 
 
 def _inspect_h300_static(args: argparse.Namespace) -> int:
-    report = inspect_h300_static_project(args.project_root)
+    try:
+        report = inspect_h300_static_project(args.project_root)
+    except FileNotFoundError:
+        print("Error: H300 static project directory not found.", file=sys.stderr)
+        return 1
+
     if args.json:
         _print_json(report.to_dict())
         return 0

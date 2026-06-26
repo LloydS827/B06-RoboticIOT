@@ -431,8 +431,9 @@ def test_cli_inspect_h300_static_missing_directory_returns_error(tmp_path: Path)
     result = _run(["inspect-h300-static", str(tmp_path / "missing"), "--json"])
 
     assert result.returncode == 1
-    assert "Error:" in result.stderr
+    assert result.stderr == "Error: H300 static project directory not found.\n"
     assert str(tmp_path) not in result.stdout
+    assert str(tmp_path) not in result.stderr
 
 
 def test_cli_doctor_json_reports_environment():
