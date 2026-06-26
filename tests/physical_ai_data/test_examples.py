@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from physical_ai_data.stage8_h300_demo import generate_stage8_h300_synthetic_demo
+from tests.physical_ai_data.test_h300_static_project import create_h300_static_project_fixture
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -313,3 +314,41 @@ def test_sdk_real_data_onboarding_example_removes_failed_rrd_output(tmp_path: Pa
     payload = json.loads(result.stdout)
     assert payload["output_index"] is None
     assert not output_rrd.exists()
+
+
+def test_sdk_h300_static_project_inspect_example_runs_synthetic_fixture(tmp_path: Path):
+    project = create_h300_static_project_fixture(tmp_path / "project")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "examples/sdk_h300_static_project_inspect.py",
+            str(project),
+        ],
+        cwd=ROOT,
+        env=_env(),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["recognized"] is True
+    assert payload["summary"]["image_count"] == 1
+    assert payload["summary"]["point_cloud_count"] == 1
+    assert payload["summary"]["weld_seam_count"] == 2
+    assert payload["summary"]["path_plan_count"] == 2
+    assert payload["root_label"] == "<local-project>"
+
+    assert "Operator_Wang" not in result.stdout
+    assert "Operator_Wang_notes" not in result.stdout
+    assert "client_alpha" not in result.stdout
+    assert "20260101" not in result.stdout
+    assert "010101" not in result.stdout
+    assert "22222" not in result.stdout
+    assert "project_20260101_010101" not in result.stdout
+    assert str(project) not in result.stdout
+    assert str(tmp_path) not in result.stdout
+    assert "C:/SmartWeldData" not in result.stdout
+    assert "192.168" not in result.stdout

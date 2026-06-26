@@ -118,7 +118,7 @@ Stage 10 adoption path 之后已形成 **Stage 11 H300 sample replacement readin
 - **Stage 8 readiness docs**：提供能力链路可视化、`synthetic-to-real gap register` 和 A02 evidence handoff synthetic example，用于工程/A01/A02 评审下一步真实样本替换。
 - **Stage 11 sample replacement readiness**：提供 `assess_h300_sample_readiness(...)` SDK 和 `physical-ai-package assess-h300-readiness` CLI，用于对候选 H300 Clean/Raw roots 做替换前检查；它是样本替换门禁，不是 real data pilot 完成态。
 - **Stage 11.1 SDK real-data onboarding hardening**：提供 `doctor` 环境检查、candidate real/de-identified onboarding guide、`examples/sdk_real_data_onboarding.py` 和 `PipelineResult.to_dict()` 输出索引，用于候选真实/脱敏 Clean Zone 的受控整理模板；它不代表仓库已有真实 H300 样本。
-- **Stage 12A H300 静态工程包 discovery**：记录本地静态工程包的结构观察、脱敏策略、计划 CLI `physical-ai-package inspect-h300-static path/to/project --json` 和 Stage 12B/13 的衔接边界；真实工程数据仍 local-only。
+- **Stage 12A H300 静态工程包 discovery**：记录本地静态工程包的结构观察、脱敏策略、CLI/SDK inspection 入口 `physical-ai-package inspect-h300-static path/to/project --json` / `inspect_h300_static_project(...)` 和 Stage 12B/13 的衔接边界；真实工程数据仍 local-only。
 - **Stage 7.1 simulated Raw/Clean fixture**：可生成 A01 H300 最小焊接作业窗口替代样本，并让 Clean Zone 对齐现有 `weld_workcell` importer contract。
 - **Weld workcell importer candidate**：`WeldWorkcellPackageImporter` 可承接本地机器人焊接工站业务导出目录，是 Clean Zone offline importer contract 和 handoff contract，不是生产 connector。
 - **validate / summarize / candidate export**：可对 package 做开发期校验、概要汇总，并导出 `derived/candidates.csv` 候选样本。
@@ -272,7 +272,7 @@ LeRobot 真实开放数据导入仍使用 Stage 4 文档中的 `uv` 可选环境
 
 ### 阶段 12A：H300 static engineering project discovery
 
-目标是在实时 API 到位前，先对本地 H300 静态工程包做只读结构发现：识别工程主 JSON、相机/点云索引、图片、PCD/xyz 点云、焊缝 recipe、路径规划、Lua/ABB RAPID 风格程序和 flow config 等 source artifacts，形成 SDK inspection 输入、脱敏结构摘要和 Stage 12B/13 决策材料。本阶段仅计划 `physical-ai-package inspect-h300-static path/to/project --json` 这类 inspect 入口，不做 SDK 报告格式转换，不做 production connector、DB/schema、realtime API、demo UI 或 Clean Zone 自动转换。
+目标是在实时 API 到位前，先对本地 H300 静态工程包做只读结构发现：识别工程主 JSON、相机/点云索引、图片、PCD/xyz 点云、焊缝 recipe、路径规划、Lua/ABB RAPID 风格程序和 flow config 等 source artifacts，形成 SDK inspection 输入、脱敏结构摘要和 Stage 12B/13 决策材料。本阶段提供 `physical-ai-package inspect-h300-static path/to/project --json` 和 `inspect_h300_static_project(...)` 这类 inspection 入口，不做 SDK 报告格式转换，不做 production connector、DB/schema、realtime API、demo UI 或 Clean Zone 自动转换。
 
 ## 近期输出物
 
